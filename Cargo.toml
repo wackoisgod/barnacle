@@ -1,9 +1,24 @@
 [package]
-name = "barnacle"
+name = "bc"
 version = "0.1.0"
 authors = ["Andrew Spiering <aspiering@gmail.com>"]
 edition = "2018"
+default-run = "bc"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+clap = "2.33.0"
+rustyline = "6.0.0"
+failure = "0.1.6"
+futures = { version = "0.3", features = ["compat", "io-compat"] }
+futures-util = "0.3.1"
+strip-ansi-escapes = "0.1.0"
+tui = { version = "0.8.0", features = ["crossterm"], default-features = false }
+clipboard = "0.5.0"
+crossterm =  "0.15"
+unicode-width = "0.1.7"
+
+[[bin]]
+name = "bc"
+path = "src/main.rs"
