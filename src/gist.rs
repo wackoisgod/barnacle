@@ -49,16 +49,15 @@ impl GistUpdate {
                         files: hm,
                 }
         }
-        pub fn update(&self, url: &str) -> Result<GistPost> {
+        pub fn update(&self, url: &str) -> Result<String> {
                 let mut resp: Response = Client::new()
                         .patch(url)
                         .bearer_auth(TOKEN.clone())
                         .json(self)
                         .send()
                         .chain_err(|| "update gist faild")?;
-                println!("{}", resp.text().unwrap());
-                let gist_spot: GistPost = resp.json().chain_err(|| "convert to GistPost faild")?;
-                Ok(gist_spot)
+                //let gist_spot: GistPost = resp.json().chain_err(|| "convert to GistPost faild")?;
+                Ok("gist_spot".to_string())
         }
 }
 

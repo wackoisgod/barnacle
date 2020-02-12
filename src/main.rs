@@ -10,6 +10,8 @@ use crate::event::Key;
 use app::{App, WorkItem, AppMode};
 use clap::App as ClapApp;
 use std::error::Error;
+use backtrace::Backtrace;
+
 use crossterm::{
     cursor::MoveTo,
     event::{DisableMouseCapture, EnableMouseCapture},
@@ -127,7 +129,38 @@ pub fn handler(key: Key, app: &mut App) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn panic_hook(info: &PanicInfo<'_>) {
+    if cfg!(debug_assertions) {
+        let location = info.location().unwrap();
+
+        let msg = match info.payload().downcast_ref::<&'static str>() {
+            Some(s) => *s,
+            None => match info.payload().downcast_ref::<String>() {
+                Some(s) => &s[..],
+                None => "Box<Any>",
+            },
+        };
+
+        let stacktrace: String = format!("{:?}", Backtrace::new()).replace('\n', "\n\r");
+
+        disable_raw_mode().unwrap();
+        execute!(
+            io::stdout(),
+            LeaveAlternateScreen,
+            Print(format!(
+                "thread '<unnamed>' panicked at '{}', {}\n\r{}",
+                msg, location, stacktrace
+            )),
+            DisableMouseCapture
+        )
+        .unwrap();
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
+    panic::set_hook(Box::new(|info| {
+        panic_hook(info);
+    }));
 
     ClapApp::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
