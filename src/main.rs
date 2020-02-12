@@ -1,6 +1,10 @@
+#[macro_use]
+extern crate error_chain;
+
 mod app;
 mod event;
 mod ui;
+mod gist;
 
 use crate::event::Key;
 use app::{App, WorkItem, AppMode};
@@ -32,6 +36,7 @@ use std::fs::File;
 use std::io::Read;
 use num_enum::TryFromPrimitive;
 use std::convert::TryFrom;
+use gist::{ListGist, GistPost, GistUpdate, get_gist_file};
 
 fn close_application() -> Result<(), failure::Error> {
     disable_raw_mode()?;
@@ -98,16 +103,23 @@ pub fn handler(key: Key, app: &mut App) -> Result<(), Box<dyn Error>> {
             }
         }
         Key::Char('o') => {
-            ::serde_json::to_writer(&File::create("data.json")?, &app.tasks)?
+            let s = ::serde_json::to_string(&app.tasks).unwrap();
+            let gg = GistUpdate::new(s, "Test".to_string(), "Test".to_string(), Some("Test".to_string()));
+            //let x = ::serde_json::to_string_pretty(&gg).unwrap();
+
+            //println!("{}", x.to_string());
+            let list_gist = ListGist::get_update_list_gist().unwrap();
+            let file = list_gist._search_url_gist("48eef7bdcc8b3a10f382810e8bb805df").unwrap();
+            let xyz = gg.update(&file)?;
+            //println!("{}", xyz.to_string());
         }
         Key::Char('n') => {
-            let mut file = File::open("data.json")?;
-            let mut contents = String::new();
-            file.read_to_string(&mut contents)?;
-        
-            // Deserialize and print Rust data structure.
-            let data: Vec<WorkItem> = serde_json::from_str(&contents)?;
-            app.tasks = data;
+            // 48eef7bdcc8b3a10f382810e8bb805df
+            let list_gist = ListGist::get_update_list_gist().unwrap();
+            let file = list_gist.get_url_gist_file("48eef7bdcc8b3a10f382810e8bb805df").unwrap();
+            let data = get_gist_file(&file).unwrap();
+            let actualData: Vec<WorkItem> = serde_json::from_str(&data)?;
+            app.tasks = actualData;            
         }
         _=> {}
     }
@@ -204,6 +216,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                             );
 
                             app.selected_index = next_index;
+                        }
+                        Key::Ctrl('h') => {
+                            let list_gist = ListGist::get_update_list_gist().unwrap();
+                            list_gist.print(true);
                         }
                         Key::Left => {
                             if app.write_mode {
