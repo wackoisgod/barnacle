@@ -5,12 +5,16 @@ mod app;
 mod event;
 mod ui;
 mod gist;
+mod config;
+
 
 use crate::event::Key;
 use app::{App, WorkItem, AppMode};
 use clap::App as ClapApp;
 use std::error::Error;
 use backtrace::Backtrace;
+use config::ClientConfig;
+
 
 use crossterm::{
     cursor::MoveTo,
@@ -107,19 +111,15 @@ pub fn handler(key: Key, app: &mut App) -> Result<(), Box<dyn Error>> {
         Key::Char('o') => {
             let s = ::serde_json::to_string(&app.tasks).unwrap();
             let gg = GistUpdate::new(s, "Test".to_string(), "Test".to_string(), Some("Test".to_string()));
-            //let x = ::serde_json::to_string_pretty(&gg).unwrap();
 
-            //println!("{}", x.to_string());
-            let list_gist = ListGist::get_update_list_gist().unwrap();
-            let file = list_gist._search_url_gist("48eef7bdcc8b3a10f382810e8bb805df").unwrap();
-            let xyz = gg.update(&file)?;
-            //println!("{}", xyz.to_string());
+            let list_gist = ListGist::get_update_list_gist(&app.client_config.client_secret).unwrap();
+            let file = list_gist._search_url_gist(&app.client_config.client_id).unwrap();
+            let xyz = gg.update(&file, &app.client_config.client_secret)?;
         }
         Key::Char('n') => {
-            // 48eef7bdcc8b3a10f382810e8bb805df
-            let list_gist = ListGist::get_update_list_gist().unwrap();
-            let file = list_gist.get_url_gist_file("48eef7bdcc8b3a10f382810e8bb805df").unwrap();
-            let data = get_gist_file(&file).unwrap();
+            let list_gist = ListGist::get_update_list_gist(&app.client_config.client_secret).unwrap();
+            let file = list_gist.get_url_gist_file(&app.client_config.client_id).unwrap();
+            let data = get_gist_file(&file, &app.client_config.client_secret).unwrap();
             let actualData: Vec<WorkItem> = serde_json::from_str(&data)?;
             app.tasks = actualData;            
         }
@@ -170,6 +170,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .after_help("Your Github Gist ID and Client Secret are stored in $HOME/.config/barnacle/client.yml")
         .get_matches();
 
+        let mut client_config = ClientConfig::new();
+        client_config.load_config()?;
+
         let mut stdout = stdout();
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
         enable_raw_mode()?;
@@ -181,6 +184,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let events = event::Events::new();
 
         let mut app = App::new();
+        app.client_config = client_config;
+
+        app.sync();
 
         terminal.clear()?;
 
@@ -251,7 +257,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             app.selected_index = next_index;
                         }
                         Key::Ctrl('h') => {
-                            let list_gist = ListGist::get_update_list_gist().unwrap();
+                            let list_gist = ListGist::get_update_list_gist(&app.client_config.client_secret).unwrap();
                             list_gist.print(true);
                         }
                         Key::Left => {

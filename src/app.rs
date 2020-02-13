@@ -1,6 +1,5 @@
 extern crate chrono;
-
-use failure::{err_msg, format_err};
+use super::{config::ClientConfig};
 use std::str::FromStr;
 use std::{
     cmp::{max, min},
@@ -15,6 +14,8 @@ use std::slice::Iter;
 use self::AppMode::*;
 use num_enum::TryFromPrimitive;
 use std::convert::TryFrom;
+use super::{gist::ListGist, gist::GistPost, gist::GistUpdate, gist::get_gist_file};
+
 
 #[derive(Clone, PartialEq, Debug, Copy, Serialize, Deserialize,)]
 pub enum ItemStatus {
@@ -174,6 +175,7 @@ pub struct App {
     pub selected_index: usize,
     pub mode: AppMode,
     pub write_mode: bool,
+    pub client_config: ClientConfig,
 }
 
 impl App {
@@ -187,6 +189,15 @@ impl App {
             selected_index: 0,
             mode: AppMode::All,
             write_mode: true,
+            client_config: Default::default(),
         }
+    }
+
+    pub fn sync(&mut self) {
+        let list_gist = ListGist::get_update_list_gist(&self.client_config.client_secret).unwrap();
+        let file = list_gist.get_url_gist_file(&self.client_config.client_id).unwrap();
+        let data = get_gist_file(&file, &self.client_config.client_secret).unwrap();
+        let actualData: Vec<WorkItem> = serde_json::from_str(&data).unwrap();
+        self.tasks = actualData;      
     }
 }

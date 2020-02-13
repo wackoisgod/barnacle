@@ -192,12 +192,11 @@ fn draw_table<B>(
         
         // TODO: May want to change the style if its been sitting to many days 
         if let Some(title_idx) = header.get_index(ColumnId::Content) {
-            if let Some(_) = item.org_item.finished_time {
-                style = style.fg(Color::LightGreen)
-            }
-
-            if item.org_item.status == ItemStatus::WontFix {
-                style = style.fg(Color::Red).modifier(Modifier::CROSSED_OUT)
+            match item.org_item.status {
+                ItemStatus::WontFix => style = style.fg(Color::Red).modifier(Modifier::CROSSED_OUT),
+                ItemStatus::Started => style = style.fg(Color::LightGreen),
+                ItemStatus::Finished => style = style.fg(Color::Rgb(149, 66, 245)),
+                _ => {}
             }
         }
 

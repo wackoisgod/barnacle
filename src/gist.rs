@@ -49,10 +49,10 @@ impl GistUpdate {
                         files: hm,
                 }
         }
-        pub fn update(&self, url: &str) -> Result<String> {
+        pub fn update(&self, url: &str, token: &str) -> Result<String> {
                 let mut resp: Response = Client::new()
                         .patch(url)
-                        .bearer_auth(TOKEN.clone())
+                        .bearer_auth(token)
                         .json(self)
                         .send()
                         .chain_err(|| "update gist faild")?;
@@ -156,10 +156,10 @@ pub struct ListGist {
     list: Vec<ResponseGist>,
 }
 
-pub fn get_gist_file(url: &str) -> Result<String> {
+pub fn get_gist_file(url: &str, token: &str) -> Result<String> {
     let mut resp: Response = Client::new()
         .get(url)
-        .bearer_auth(&*TOKEN)
+        .bearer_auth(token)
         .send()
         .chain_err(|| format!("failed get gist file {}", url))?;
     if resp.status().is_success() {
@@ -189,10 +189,10 @@ impl ListGist {
     //     return utils::write_file(path_file, list_string);
     // }
 
-    pub fn get_update_list_gist() -> Result<ListGist> {
+    pub fn get_update_list_gist(token: &str) -> Result<ListGist> {
         let mut resp: Response = Client::new()
             .get(URL)
-            .bearer_auth(&*TOKEN)
+            .bearer_auth(token)
             .send()
             .chain_err(|| "failed get list")?;
         if resp.status().is_success() {
