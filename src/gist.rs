@@ -14,51 +14,51 @@ mod errors {
 use errors::*;
 
 lazy_static! {
-    pub static ref TOKEN: String = String::from(Token::new("1647f2b78fa25ea3deb1cbd7ee314bfabbe5e135".to_string()).get());
+    pub static ref TOKEN: String =
+        String::from(Token::new("1647f2b78fa25ea3deb1cbd7ee314bfabbe5e135".to_string()).get());
 }
 
-pub const TOKEN_FILE_NAME:&'static str = ".gist-rs";
-pub const LIST_GIST_FILE_NAME:&'static str = ".list-gist";
+pub const TOKEN_FILE_NAME: &'static str = ".gist-rs";
+pub const LIST_GIST_FILE_NAME: &'static str = ".list-gist";
 pub const URL: &'static str = "https://api.github.com/gists";
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GistUpdate {
-        pub description: Option<String>,
-        pub files: HashMap<String, FileUpdate>,
+    pub description: Option<String>,
+    pub files: HashMap<String, FileUpdate>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FileUpdate {
-        pub content: String,
-        pub filename: Option<String>,
+    pub content: String,
+    pub filename: Option<String>,
 }
 
 impl GistUpdate {
-        pub fn new(cont: String, desc: String, old_name: String, new_name: Option<String>) -> Self {
-                let mut hm: HashMap<String, FileUpdate> = HashMap::new();
-                hm.insert(
-                        old_name,
-                        FileUpdate {
-                                content: cont,
-                                filename: new_name,
-                        },
-                );
-                GistUpdate {
-                        description: Some(desc),
-                        files: hm,
-                }
+    pub fn new(cont: String, desc: String, old_name: String, new_name: Option<String>) -> Self {
+        let mut hm: HashMap<String, FileUpdate> = HashMap::new();
+        hm.insert(
+            old_name,
+            FileUpdate {
+                content: cont,
+                filename: new_name,
+            },
+        );
+        GistUpdate {
+            description: Some(desc),
+            files: hm,
         }
-        pub fn update(&self, url: &str, token: &str) -> Result<String> {
-                let mut resp: Response = Client::new()
-                        .patch(url)
-                        .bearer_auth(token)
-                        .json(self)
-                        .send()
-                        .chain_err(|| "update gist faild")?;
-                //let gist_spot: GistPost = resp.json().chain_err(|| "convert to GistPost faild")?;
-                Ok("gist_spot".to_string())
-        }
+    }
+    pub fn update(&self, url: &str, token: &str) -> Result<String> {
+        let mut resp: Response = Client::new()
+            .patch(url)
+            .bearer_auth(token)
+            .json(self)
+            .send()
+            .chain_err(|| "update gist faild")?;
+        //let gist_spot: GistPost = resp.json().chain_err(|| "convert to GistPost faild")?;
+        Ok("gist_spot".to_string())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -204,7 +204,7 @@ impl ListGist {
 
     // pub fn sync() -> Result<ListGist> {
     //     let list_gist = ListGist::get_update_list_gist().unwrap();
-    //     list_gist.write().unwrap();        
+    //     list_gist.write().unwrap();
     //     Ok(list_gist)
     // }
 

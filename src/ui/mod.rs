@@ -1,20 +1,14 @@
-use super::{
-    app::{
-        App,
-        WorkItem,
-        ItemStatus
-    }
-};
+use super::app::{App, ItemStatus, WorkItem};
 
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Modifier, Style, Color},
-    widgets::{Block, Borders, Gauge, Paragraph, Row, SelectableList, Table, Text, Widget, List},
+    style::{Color, Modifier, Style},
+    widgets::{Block, Borders, Gauge, List, Paragraph, Row, SelectableList, Table, Text, Widget},
     Frame,
 };
 
-use chrono::offset::{Local};
+use chrono::offset::Local;
 
 pub const SMALL_TERMINAL_HEIGHT: u16 = 45;
 
@@ -50,7 +44,7 @@ pub struct TableHeaderItem<'a> {
 
 pub struct TableItem<'a> {
     id: String,
-    org_item:  &'a WorkItem,
+    org_item: &'a WorkItem,
     format: Vec<String>,
 }
 
@@ -71,19 +65,11 @@ where
 
     let input_string: String = app.input.iter().collect();
     Paragraph::new([Text::raw(&input_string)].iter())
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("New Task:"),
-        )
+        .block(Block::default().borders(Borders::ALL).title("New Task:"))
         .render(f, chunks[0]);
 
     Paragraph::new([Text::raw(app.input_cursor_position.to_string())].iter())
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Help:"),
-        )
+        .block(Block::default().borders(Borders::ALL).title("Help:"))
         .render(f, chunks[1]);
 }
 
@@ -96,27 +82,27 @@ where
         .constraints([Constraint::Percentage(100)].as_ref())
         .split(layout_chunk);
 
-        let header = TableHeader {          
-            items: vec![
-                TableHeaderItem {
-                    id: ColumnId::Content,
-                    text: "Content",
-                    width: get_percentage_width(layout_chunk.width, 8.0 / 9.0),
-                    ..Default::default()
-                },
-                TableHeaderItem {
-                    text: "Started",
-                    width: get_percentage_width(layout_chunk.width, 0.7 / 9.0),
-                    ..Default::default()
-                },
-                TableHeaderItem {
-                    id: ColumnId::Days,
-                    text: "Days",
-                    width: get_percentage_width(layout_chunk.width, 1.6 / 6.0),
-                    ..Default::default()
-                },
-            ],
-        };
+    let header = TableHeader {
+        items: vec![
+            TableHeaderItem {
+                id: ColumnId::Content,
+                text: "Content",
+                width: get_percentage_width(layout_chunk.width, 8.0 / 9.0),
+                ..Default::default()
+            },
+            TableHeaderItem {
+                text: "Started",
+                width: get_percentage_width(layout_chunk.width, 0.7 / 9.0),
+                ..Default::default()
+            },
+            TableHeaderItem {
+                id: ColumnId::Days,
+                text: "Days",
+                width: get_percentage_width(layout_chunk.width, 1.6 / 6.0),
+                ..Default::default()
+            },
+        ],
+    };
 
     let messages = app
         .tasks
@@ -128,13 +114,32 @@ where
             org_item: m,
             format: vec![
                 m.content.as_ref().unwrap().to_string(),
-                if let Some(start_time) = m.started_time { start_time.format("%Y-%m-%d").to_string() } else { "-".to_string() },
-                if let Some(_) = m.finished_time { "-".to_string() } else { m.created_time.signed_duration_since(Local::now()).num_days().to_string() },
+                if let Some(start_time) = m.started_time {
+                    start_time.format("%Y-%m-%d").to_string()
+                } else {
+                    "-".to_string()
+                },
+                if let Some(_) = m.finished_time {
+                    "-".to_string()
+                } else {
+                    m.created_time
+                        .signed_duration_since(Local::now())
+                        .num_days()
+                        .to_string()
+                },
             ],
         })
         .collect::<Vec<TableItem>>();
 
-    draw_table(f, app, chunks[0], &header, &messages, app.selected_index, (false, false));
+    draw_table(
+        f,
+        app,
+        chunks[0],
+        &header,
+        &messages,
+        app.selected_index,
+        (false, false),
+    );
 }
 
 pub fn draw_core_layout<B>(f: &mut Frame<B>, app: &App)
@@ -148,16 +153,10 @@ where
     };
 
     let parent_layout = Layout::default()
-    .direction(Direction::Vertical)
-    .constraints(
-        [
-            Constraint::Min(20),
-            Constraint::Length(3),
-        ]
-        .as_ref(),
-    )
-    .margin(margin)
-    .split(f.size());
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(20), Constraint::Length(3)].as_ref())
+        .margin(margin)
+        .split(f.size());
 
     draw_task_list(f, app, parent_layout[0]);
     draw_input_and_help_box(f, app, parent_layout[1]);
@@ -176,7 +175,9 @@ fn draw_table<B>(
 {
     let header = table_layout;
 
-    let selected_style = Style::default().fg(Color::LightBlue).modifier(Modifier::BOLD);
+    let selected_style = Style::default()
+        .fg(Color::LightBlue)
+        .modifier(Modifier::BOLD);
 
     let padding = 5;
     let offset = layout_chunk
@@ -189,8 +190,7 @@ fn draw_table<B>(
         let mut formatted_row = item.format.clone();
         let mut style = Style::default(); // default styling
 
-        
-        // TODO: May want to change the style if its been sitting to many days 
+        // TODO: May want to change the style if its been sitting to many days
         if let Some(title_idx) = header.get_index(ColumnId::Content) {
             match item.org_item.status {
                 ItemStatus::WontFix => style = style.fg(Color::Red).modifier(Modifier::CROSSED_OUT),
@@ -200,10 +200,8 @@ fn draw_table<B>(
             }
         }
 
-        // TODO: May want to change the style if its been sitting to many days 
-        if let Some(_) = header.get_index(ColumnId::Days) {
-            
-        }
+        // TODO: May want to change the style if its been sitting to many days
+        if let Some(_) = header.get_index(ColumnId::Days) {}
 
         // Next check if the item is under selection.
         if Some(i) == selected_index.checked_sub(offset) {
@@ -222,13 +220,13 @@ fn draw_table<B>(
     let title = format!("Tasks({}):", app.mode);
 
     Table::new(header.items.iter().map(|h| h.text), rows)
-    .block(
-        Block::default()
-            .borders(Borders::ALL)
-            .style(Style::default())
-            .title(&title),
-    )
-    .style(Style::default())
-    .widths(&widths)
-    .render(f, layout_chunk);
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .style(Style::default())
+                .title(&title),
+        )
+        .style(Style::default())
+        .widths(&widths)
+        .render(f, layout_chunk);
 }

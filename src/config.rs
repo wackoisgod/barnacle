@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
 use dirs;
 use failure::err_msg;
+use serde::{Deserialize, Serialize};
 use std::{
     fs,
     io::{stdin, Write},
@@ -88,10 +88,10 @@ impl ClientConfig {
             println!("\nHow to get setup:\n");
 
             let instructions = [
-               "Go to the Github dashboard - https://github.com/settings/tokens",
-               "Click `Generate New Token` and select Gist",
-               "Copy Token and paste at prompt`",
-               "You are now ready to authenticate with Gist!",
+                "Go to the Github dashboard - https://github.com/settings/tokens",
+                "Click `Generate New Token` and select Gist",
+                "Copy Token and paste at prompt`",
+                "You are now ready to authenticate with Gist!",
             ];
 
             let mut number = 1;

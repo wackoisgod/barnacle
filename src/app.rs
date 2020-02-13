@@ -1,23 +1,22 @@
 extern crate chrono;
-use super::{config::ClientConfig};
+use self::AppMode::*;
+use super::config::ClientConfig;
+use super::{gist::get_gist_file, gist::GistPost, gist::GistUpdate, gist::ListGist};
+use chrono::prelude::*;
+use num_enum::TryFromPrimitive;
+use serde_derive::{Deserialize, Serialize};
+use std::convert::TryFrom;
+use std::slice::Iter;
 use std::str::FromStr;
 use std::{
     cmp::{max, min},
     collections::HashSet,
-    time::Instant,
     fmt,
+    time::Instant,
 };
 use tui::layout::Rect;
-use chrono::prelude::*;
-use serde_derive::{Deserialize, Serialize};
-use std::slice::Iter;
-use self::AppMode::*;
-use num_enum::TryFromPrimitive;
-use std::convert::TryFrom;
-use super::{gist::ListGist, gist::GistPost, gist::GistUpdate, gist::get_gist_file};
 
-
-#[derive(Clone, PartialEq, Debug, Copy, Serialize, Deserialize,)]
+#[derive(Clone, PartialEq, Debug, Copy, Serialize, Deserialize)]
 pub enum ItemStatus {
     UnStarted,
     Started,
@@ -66,14 +65,11 @@ pub struct WorkItem {
 
 mod normal_date_format {
     use chrono::{DateTime, Local, TimeZone};
-    use serde::{self, Deserialize, Serializer, Deserializer};
+    use serde::{self, Deserialize, Deserializer, Serializer};
 
     const FORMAT: &'static str = "%Y-%m-%d %H:%M:%S";
 
-    pub fn serialize<S>(
-        date: &DateTime<Local>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(date: &DateTime<Local>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -81,50 +77,41 @@ mod normal_date_format {
         serializer.serialize_str(&s)
     }
 
-    pub fn deserialize<'de, D>(
-        deserializer: D,
-    ) -> Result<DateTime<Local>, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Local>, D::Error>
     where
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        Local.datetime_from_str(&s, FORMAT).map_err(serde::de::Error::custom)
+        Local
+            .datetime_from_str(&s, FORMAT)
+            .map_err(serde::de::Error::custom)
     }
 }
 
 mod option_date_format {
-    use chrono::{DateTime, TimeZone, Local};
-    use serde::{self, Deserialize, Serializer, Deserializer};
+    use chrono::{DateTime, Local, TimeZone};
+    use serde::{self, Deserialize, Deserializer, Serializer};
 
     const FORMAT: &'static str = "%Y-%m-%d %H:%M:%S";
 
-    pub fn serialize<S>(
-        date: &Option<DateTime<Local>>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(date: &Option<DateTime<Local>>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         if let Some(d) = date {
             serializer.serialize_str(&d.format(FORMAT).to_string())
-        }
-        else 
-        {
+        } else {
             serializer.serialize_unit()
-        }        
+        }
     }
 
-    pub fn deserialize<'de, D>(
-        deserializer: D,
-    ) -> Result<Option<DateTime<Local>>, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<DateTime<Local>>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        match  String::deserialize(deserializer) {
-            Ok(_r) => {
-                Ok(Some(Local.datetime_from_str(&_r, FORMAT).unwrap()))
-            }
-            Err(_e) => Ok(None)
+        match String::deserialize(deserializer) {
+            Ok(_r) => Ok(Some(Local.datetime_from_str(&_r, FORMAT).unwrap())),
+            Err(_e) => Ok(None),
         }
     }
 }
@@ -195,9 +182,11 @@ impl App {
 
     pub fn sync(&mut self) {
         let list_gist = ListGist::get_update_list_gist(&self.client_config.client_secret).unwrap();
-        let file = list_gist.get_url_gist_file(&self.client_config.client_id).unwrap();
+        let file = list_gist
+            .get_url_gist_file(&self.client_config.client_id)
+            .unwrap();
         let data = get_gist_file(&file, &self.client_config.client_secret).unwrap();
         let actualData: Vec<WorkItem> = serde_json::from_str(&data).unwrap();
-        self.tasks = actualData;      
+        self.tasks = actualData;
     }
 }
