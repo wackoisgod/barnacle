@@ -321,6 +321,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                         app.tasks.push(workItem);
 
                         app.selected_index = app.tasks.len() - 1;
+                        app.write_mode = false;
+                        terminal.hide_cursor()?;
                     }
                     Key::Char(c) => {
                         if !app.write_mode && key == Key::Char('/') {

@@ -16,11 +16,11 @@ use std::{
 };
 use tui::layout::Rect;
 
-#[derive(Clone, PartialEq, Debug, Copy, Serialize, Deserialize)]
+#[derive(Clone, Eq, Ord, PartialEq, PartialOrd, Debug, Copy, Serialize, Deserialize)]
 pub enum ItemStatus {
-    UnStarted,
     Started,
     Finished,
+    UnStarted,
     WontFix,
 }
 

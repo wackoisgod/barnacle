@@ -104,7 +104,7 @@ where
         ],
     };
 
-    let messages = app
+    let mut messages = app
         .tasks
         .iter()
         .enumerate()
@@ -122,15 +122,15 @@ where
                 if let Some(_) = m.finished_time {
                     "-".to_string()
                 } else {
-                    m.created_time
-                        .signed_duration_since(Local::now())
+                    Local::now()
+                        .signed_duration_since(m.created_time)
                         .num_days()
                         .to_string()
                 },
             ],
         })
         .collect::<Vec<TableItem>>();
-
+    messages.sort_by(|a,b| a.org_item.status.partial_cmp(&b.org_item.status).unwrap());
     draw_table(
         f,
         app,
