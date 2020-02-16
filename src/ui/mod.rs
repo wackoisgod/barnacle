@@ -1,14 +1,15 @@
-use super::app::{App, ItemStatus, WorkItem};
+use super::app::{App, ItemStatus, WorkItem, AppMode};
 
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Gauge, List, Paragraph, Row, SelectableList, Table, Text, Widget},
+    widgets::{Block, Borders, Paragraph, Row, Table, Text, Widget},
     Frame,
 };
 
 use chrono::offset::Local;
+use std::fmt::Write;
 
 pub const SMALL_TERMINAL_HEIGHT: u16 = 45;
 
@@ -63,12 +64,19 @@ where
         .constraints([Constraint::Percentage(95), Constraint::Percentage(5)].as_ref())
         .split(layout_chunk);
 
-    let input_string: String = app.input.iter().collect();
+    let mut input_string = String::new();
+    let (_a, b) = match app.mode {
+        AppMode::Global => (write!(input_string, "").unwrap(), 0),
+        AppMode::Command => (write!(input_string, "{}", app.command_bar.buffer()).unwrap(), app.command_bar.input_cursor_position()),
+        AppMode::Insert => (write!(input_string, "{}", app.insert_bar.buffer()).unwrap(), app.insert_bar.input_cursor_position()) 
+    };
+
+    let title = format!("New Task({}):", app.mode);
     Paragraph::new([Text::raw(&input_string)].iter())
-        .block(Block::default().borders(Borders::ALL).title("New Task:"))
+        .block(Block::default().borders(Borders::ALL).title(&title))
         .render(f, chunks[0]);
 
-    Paragraph::new([Text::raw(app.input_cursor_position.to_string())].iter())
+    Paragraph::new([Text::raw(b.to_string())].iter())
         .block(Block::default().borders(Borders::ALL).title("Help:"))
         .render(f, chunks[1]);
 }
@@ -104,11 +112,11 @@ where
         ],
     };
 
-    let mut messages = app
+    let messages = app
         .tasks
         .iter()
         .enumerate()
-        .filter(|(_u, l)| l.is_valid_for_mode(app.mode))
+        .filter(|(_u, l)| l.is_valid_for_mode(app.filter))
         .map(|(i, m)| TableItem {
             id: i.to_string(),
             org_item: m,
@@ -130,7 +138,6 @@ where
             ],
         })
         .collect::<Vec<TableItem>>();
-    messages.sort_by(|a,b| a.org_item.status.partial_cmp(&b.org_item.status).unwrap());
     draw_table(
         f,
         app,
@@ -169,7 +176,7 @@ fn draw_table<B>(
     table_layout: &TableHeader,
     items: &[TableItem], // The nested vector must have the same length as the `header_columns`
     selected_index: usize,
-    highlight_state: (bool, bool),
+    _highlight_state: (bool, bool),
 ) where
     B: Backend,
 {
@@ -187,11 +194,11 @@ fn draw_table<B>(
         .unwrap_or(0);
 
     let rows = items.iter().skip(offset).enumerate().map(|(i, item)| {
-        let mut formatted_row = item.format.clone();
+        let formatted_row = item.format.clone();
         let mut style = Style::default(); // default styling
 
         // TODO: May want to change the style if its been sitting to many days
-        if let Some(title_idx) = header.get_index(ColumnId::Content) {
+        if let Some(_title_idx) = header.get_index(ColumnId::Content) {
             match item.org_item.status {
                 ItemStatus::WontFix => style = style.fg(Color::Red).modifier(Modifier::CROSSED_OUT),
                 ItemStatus::Started => style = style.fg(Color::LightGreen),
@@ -217,7 +224,7 @@ fn draw_table<B>(
         .map(|h| Constraint::Length(h.width))
         .collect::<Vec<tui::layout::Constraint>>();
 
-    let title = format!("Tasks({}):", app.mode);
+    let title = format!("Tasks({}):", app.filter);
 
     Table::new(header.items.iter().map(|h| h.text), rows)
         .block(

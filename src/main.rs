@@ -8,52 +8,34 @@ mod gist;
 mod ui;
 
 use crate::event::Key;
-use app::{App, AppMode, WorkItem};
+use app::{App, AppMode, WorkItem, VimCommandBarResult};
 use backtrace::Backtrace;
 use clap::App as ClapApp;
 use config::ClientConfig;
 use std::error::Error;
 
-use chrono::offset::Local;
 use crossterm::{
-    cursor::MoveTo,
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     style::Print,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
 };
-use std::convert::TryInto;
 use std::{
-    cmp::{max, min},
     io::{self, stdout, Write},
     panic::{self, PanicInfo},
-    time::{Duration, Instant},
 };
 use tui::{
     backend::{Backend, CrosstermBackend},
     Terminal,
 };
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 extern crate serde_json;
-use gist::{get_gist_file, GistPost, GistUpdate, ListGist};
-use num_enum::TryFromPrimitive;
-use std::convert::TryFrom;
-use std::fs::File;
-use std::io::Read;
+use gist::{get_gist_file, GistUpdate, ListGist};
 
 fn close_application() -> Result<(), failure::Error> {
     disable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, LeaveAlternateScreen, DisableMouseCapture)?;
     Ok(())
-}
-
-fn compute_character_width(character: char) -> u16 {
-    UnicodeWidthChar::width(character)
-        .unwrap()
-        .try_into()
-        .unwrap()
 }
 
 pub fn on_down_press_handler<T>(selection_data: &[T], selection_index: Option<usize>) -> usize {
@@ -120,7 +102,7 @@ pub fn handler(key: Key, app: &mut App) -> Result<(), Box<dyn Error>> {
             let file = list_gist
                 ._search_url_gist(&app.client_config.client_id)
                 .unwrap();
-            let xyz = gg.update(&file, &app.client_config.client_secret)?;
+            gg.update(&file, &app.client_config.client_secret)?;
         }
         Key::Char('n') => {
             let list_gist =
@@ -129,8 +111,8 @@ pub fn handler(key: Key, app: &mut App) -> Result<(), Box<dyn Error>> {
                 .get_url_gist_file(&app.client_config.client_id)
                 .unwrap();
             let data = get_gist_file(&file, &app.client_config.client_secret).unwrap();
-            let actualData: Vec<WorkItem> = serde_json::from_str(&data)?;
-            app.tasks = actualData;
+            let actual_data: Vec<WorkItem> = serde_json::from_str(&data)?;
+            app.tasks = actual_data;
         }
         _ => {}
     }
@@ -204,9 +186,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     loop {
         if let Ok(size) = terminal.backend().size() {
             app.size = size;
-
-            let potential_limit = max((app.size.height as i32) - 13, 0) as u32;
-            let max_limit = min(potential_limit, 50);
         };
 
         terminal.draw(|mut f| {
@@ -234,9 +213,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         let hieght = terminal.get_frame().size().height;
 
         // Put the cursor back inside the input box
-        terminal.set_cursor(cursor_offset + app.input_cursor_position, hieght - 3)?;
+        terminal.set_cursor(cursor_offset + app.get_cursor_position(), hieght - 3)?;
 
         io::stdout().flush().ok();
+
+        app.tasks.sort_by(|a,b| a.status.partial_cmp(&b.status).unwrap());
 
         match events.next()? {
             event::Event::Input(key) => {
@@ -244,141 +225,88 @@ fn main() -> Result<(), Box<dyn Error>> {
                     close_application()?;
                     break;
                 }
-                match key {
-                    Key::Ctrl('u') => {
-                        app.input = vec![];
-                        app.input_idx = 0;
-                        app.input_cursor_position = 0;
-                        app.input.drain(..);
-                    }
-                    Key::Ctrl('a') => {
-                        app.input_idx = 0;
-                        app.input_cursor_position = 0;
-                    }
-                    Key::Ctrl('d') => {
-                        app.tasks.remove(app.selected_index);
-                        let next_index = on_up_press_handler(&app.tasks, Some(app.selected_index));
 
-                        app.selected_index = next_index;
-                    }
-                    Key::Ctrl('h') => {
-                        let list_gist =
-                            ListGist::get_update_list_gist(&app.client_config.client_secret)
-                                .unwrap();
-                        list_gist.print(true);
-                    }
-                    Key::Left => {
-                        if app.write_mode {
-                            if !app.input.is_empty() && app.input_idx > 0 {
-                                let last_c = app.input[app.input_idx - 1];
-                                app.input_idx -= 1;
-                                app.input_cursor_position -= compute_character_width(last_c);
-                            }
-                        } else {
-                            let next_index = on_up_press_handler(
-                                &AppMode::iterator().collect::<Vec<AppMode>>(),
-                                Some(app.mode as usize),
-                            );
-
-                            match AppMode::try_from(next_index) {
-                                Ok(size) => {
-                                    app.mode = size;
-                                    app.selected_index = 0;
-                                }
-                                Err(_) => app.mode = AppMode::All,
-                            }
-                        }
-                    }
-                    Key::Right => {
-                        if app.write_mode {
-                            if app.input_idx < app.input.len() {
-                                let next_c = app.input[app.input_idx];
-                                app.input_idx += 1;
-                                app.input_cursor_position += compute_character_width(next_c);
-                            }
-                        } else {
-                            let next_index = on_down_press_handler(
-                                &AppMode::iterator().collect::<Vec<AppMode>>(),
-                                Some(app.mode as usize),
-                            );
-
-                            match AppMode::try_from(next_index) {
-                                Ok(size) => {
-                                    app.mode = size;
-                                    app.selected_index = 0;
-                                }
-                                Err(_) => app.mode = AppMode::All,
-                            }
-                        }
-                    }
-                    Key::Enter => {
-                        app.input_idx = 0;
-                        app.input_cursor_position = 0;
-
-                        let mut workItem = WorkItem::new();
-                        workItem.content = Some(app.input.drain(..).collect());
-
-                        app.tasks.push(workItem);
-
-                        app.selected_index = app.tasks.len() - 1;
-                        app.write_mode = false;
-                        terminal.hide_cursor()?;
-                    }
-                    Key::Char(c) => {
-                        if !app.write_mode && key == Key::Char('/') {
-                            app.write_mode = true
-                        } else {
-                            if app.write_mode {
-                                app.input.insert(app.input_idx, c);
-                                app.input_idx += 1;
-                                app.input_cursor_position += compute_character_width(c);
-                            } else {
-                                handler(key, &mut app)?;
-                            }
-                        }
-                    }
-                    Key::Backspace => {
-                        if app.write_mode {
-                            if !app.input.is_empty() && app.input_idx > 0 {
-                                let last_c = app.input.remove(app.input_idx - 1);
-                                app.input_idx -= 1;
-                                app.input_cursor_position -= compute_character_width(last_c);
-                            }
-                        }
-                    }
-                    Key::Delete => {
-                        if app.write_mode {
-                            if !app.input.is_empty() && app.input_idx < app.input.len() {
-                                app.input.remove(app.input_idx);
-                            }
-                        }
-                    }
-                    Key::Up => {
-                        if !app.write_mode {
-                            let next_index =
-                                on_up_press_handler(&app.tasks, Some(app.selected_index));
-
-                            app.selected_index = next_index;
-                        }
-                    }
-                    Key::Esc => {
-                        app.input_idx = 0;
-                        app.input_cursor_position = 0;
-                        app.input.drain(..);
-                        app.write_mode = false;
-                        terminal.hide_cursor()?;
-                        app.selected_index = 0;
-                    }
-                    Key::Down => {
-                        if !app.write_mode {
-                            let next_index =
-                                on_down_press_handler(&app.tasks, Some(app.selected_index));
-
-                            app.selected_index = next_index;
-                        }
-                    }
-                    _ => {}
+                if key == Key::Esc {
+                    app.insert_bar.clear();
+                    app.command_bar.clear();
+                    app.mode = AppMode::Global;
+                    terminal.hide_cursor()?;
+                    app.selected_index = 0;
                 }
+
+                match app.mode {
+                    AppMode::Global => {
+                        match key {
+                            Key::Char('i') =>
+                            {
+                                app.mode = AppMode::Insert
+                            }
+                            Key::Char(':') =>
+                            {
+                                app.mode = AppMode::Command;
+                                app.command_bar.handle_input(key);
+                            }
+                            Key::Char('o') => {
+                                let s = ::serde_json::to_string(&app.tasks).unwrap();
+                                let gg = GistUpdate::new(
+                                    s,
+                                    "Test".to_string(),
+                                    "Test".to_string(),
+                                    Some("Test".to_string()),
+                                );
+                    
+                                let list_gist =
+                                    ListGist::get_update_list_gist(&app.client_config.client_secret).unwrap();
+                                let file = list_gist
+                                    ._search_url_gist(&app.client_config.client_id)
+                                    .unwrap();
+                                gg.update(&file, &app.client_config.client_secret)?;
+                            }
+                            Key::Up => {
+                                let next_index =
+                                on_up_press_handler(&app.tasks, Some(app.selected_index));
+                                app.selected_index = next_index;
+                            }
+                            Key::Down => {
+                                let next_index =
+                                        on_down_press_handler(&app.tasks, Some(app.selected_index));
+                                        app.selected_index = next_index;
+                            }
+                            Key::Ctrl('d') => {
+                                // Move these to global things
+                                app.tasks.remove(app.selected_index);
+                                let next_index = on_up_press_handler(&app.tasks, Some(app.selected_index));
+        
+                                app.selected_index = next_index;
+                            }
+                            _=> {},
+                        };
+                    },
+                    AppMode::Insert =>  {
+                        match app.insert_bar.handle_input(key) {
+                            VimCommandBarResult::Finished(task) => {
+                                let mut work_item = WorkItem::new();
+                                work_item.content = Some(task);
+                                app.tasks.push(work_item);
+                                app.tasks.sort_by(|a,b| a.status.partial_cmp(&b.status).unwrap());
+                                app.selected_index = app.tasks.len() - 1;
+                                app.mode = AppMode::Global;
+                                app.insert_bar.clear();
+                            }
+                            VimCommandBarResult::Aborted => app.mode = AppMode::Global,
+                            _=> {}
+                        }
+                    },
+                    AppMode::Command => {
+                        match app.command_bar.handle_input(key) {
+                            VimCommandBarResult::Finished(_task) => {
+                                // we should parse the commands here :D 
+                            }
+                            VimCommandBarResult::Aborted => app.mode = AppMode::Global,
+                            _=> {}
+                        }
+                    }
+                };
             }
             event::Event::Tick => {
                 // we need to do somet stuff herer ?
