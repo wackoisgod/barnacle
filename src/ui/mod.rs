@@ -71,7 +71,7 @@ where
         AppMode::Insert => (write!(input_string, "{}", app.insert_bar.buffer()).unwrap(), app.insert_bar.input_cursor_position()) 
     };
 
-    let title = format!("New Task({}):", app.mode);
+    let title = format!("{} Mode:", app.mode);
     Paragraph::new([Text::raw(&input_string)].iter())
         .block(Block::default().borders(Borders::ALL).title(&title))
         .render(f, chunks[0]);

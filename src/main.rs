@@ -71,55 +71,6 @@ pub fn on_up_press_handler<T>(selection_data: &[T], selection_index: Option<usiz
     }
 }
 
-pub fn handler(key: Key, app: &mut App) -> Result<(), Box<dyn Error>> {
-    match key {
-        Key::Char('s') => {
-            if let Some(w) = app.tasks.get_mut(app.selected_index) {
-                w.start()
-            }
-        }
-        Key::Char('f') => {
-            if let Some(w) = app.tasks.get_mut(app.selected_index) {
-                w.fin()
-            }
-        }
-        Key::Char('w') => {
-            if let Some(w) = app.tasks.get_mut(app.selected_index) {
-                w.wont_fix()
-            }
-        }
-        Key::Char('o') => {
-            let s = ::serde_json::to_string(&app.tasks).unwrap();
-            let gg = GistUpdate::new(
-                s,
-                "Test".to_string(),
-                "Test".to_string(),
-                Some("Test".to_string()),
-            );
-
-            let list_gist =
-                ListGist::get_update_list_gist(&app.client_config.client_secret).unwrap();
-            let file = list_gist
-                ._search_url_gist(&app.client_config.client_id)
-                .unwrap();
-            gg.update(&file, &app.client_config.client_secret)?;
-        }
-        Key::Char('n') => {
-            let list_gist =
-                ListGist::get_update_list_gist(&app.client_config.client_secret).unwrap();
-            let file = list_gist
-                .get_url_gist_file(&app.client_config.client_id)
-                .unwrap();
-            let data = get_gist_file(&file, &app.client_config.client_secret).unwrap();
-            let actual_data: Vec<WorkItem> = serde_json::from_str(&data)?;
-            app.tasks = actual_data;
-        }
-        _ => {}
-    }
-
-    Ok(())
-}
-
 fn panic_hook(info: &PanicInfo<'_>) {
     if cfg!(debug_assertions) {
         let location = info.location().unwrap();
@@ -146,6 +97,13 @@ fn panic_hook(info: &PanicInfo<'_>) {
         )
         .unwrap();
     }
+}
+
+
+pub fn perform_cmd(app: &mut App, cmd: String) -> Result<(), failure::Error> {
+    
+
+    Ok(())
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -192,18 +150,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             ui::draw_core_layout(&mut f, &app);
         })?;
 
-        if app.write_mode {
-            match terminal.show_cursor() {
+        match app.mode {
+            AppMode::Global => match terminal.hide_cursor() {
                 Ok(_r) => {}
                 Err(_e) => {}
-            };
-        } else {
-            match terminal.hide_cursor() {
+            },
+            _=> match terminal.show_cursor() {
                 Ok(_r) => {}
                 Err(_e) => {}
-            };
-        }
-
+            },
+        };
+        
         let cursor_offset = if app.size.height > ui::SMALL_TERMINAL_HEIGHT {
             2
         } else {
@@ -237,6 +194,21 @@ fn main() -> Result<(), Box<dyn Error>> {
                 match app.mode {
                     AppMode::Global => {
                         match key {
+                            Key::Char('s') => {
+                                if let Some(w) = app.tasks.get_mut(app.selected_index) {
+                                    w.start()
+                                }
+                            }
+                            Key::Char('f') => {
+                                if let Some(w) = app.tasks.get_mut(app.selected_index) {
+                                    w.fin()
+                                }
+                            }
+                            Key::Char('w') => {
+                                if let Some(w) = app.tasks.get_mut(app.selected_index) {
+                                    w.wont_fix()
+                                }
+                            }
                             Key::Char('i') =>
                             {
                                 app.mode = AppMode::Insert
@@ -299,8 +271,40 @@ fn main() -> Result<(), Box<dyn Error>> {
                     },
                     AppMode::Command => {
                         match app.command_bar.handle_input(key) {
-                            VimCommandBarResult::Finished(_task) => {
-                                // we should parse the commands here :D 
+                            // I don't like this code here but for now its fine
+                            VimCommandBarResult::Finished(cmd) => {
+                                let mut tokens = cmd.split_whitespace();
+                                let c = match tokens.next() {
+                                    Some(c) => &c[1..],
+                                    None => return Ok(()),
+                                };
+                            
+                                match c {
+                                    "q" =>  {
+                                        close_application()?;
+                                    },
+                                    "t" => {
+                                        // these are task based commands? 
+                                        let task_action = match tokens.next() {
+                                            Some(c) => c,
+                                            None => return Ok(()),
+                                        };
+
+                                        match task_action {
+                                            "mod" => {
+                                                use std::fmt::Write;
+
+                                                // this a modification actions so what we do is replace the current selected item
+                                                let index = tokens.next().unwrap();
+                                                let mut new_info = String::new();
+                                                write!(new_info, "{}", &tokens);
+                                            },
+                                            task_action @ _ => {},
+                                        }
+
+                                    }
+                                    c @ _ => {},
+                                };
                             }
                             VimCommandBarResult::Aborted => app.mode = AppMode::Global,
                             _=> {}

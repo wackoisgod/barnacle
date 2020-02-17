@@ -15,7 +15,6 @@ use std::convert::TryInto;
 use unicode_width::{UnicodeWidthChar};
 use std::fmt::Write;
 
-
 fn compute_character_width(character: char) -> u16 {
     UnicodeWidthChar::width(character)
         .unwrap()
@@ -364,7 +363,6 @@ pub struct App {
     pub size: Rect,
     pub selected_index: usize,
     pub filter: AppFilterMode,
-    pub write_mode: bool,
     pub client_config: ClientConfig,
     pub command_bar: VimCommandBar,
     pub insert_bar: VimInsertBar,
@@ -378,7 +376,6 @@ impl App {
             size: Rect::default(),
             selected_index: 0,
             filter: AppFilterMode::All,
-            write_mode: true,
             client_config: Default::default(),
             command_bar: VimCommandBar::new(),
             insert_bar: VimInsertBar::new(),
