@@ -1,4 +1,4 @@
-use super::app::{App, ItemStatus, WorkItem, AppMode};
+use super::app::{App, AppMode, ItemStatus, WorkItem};
 
 use tui::{
     backend::Backend,
@@ -67,8 +67,14 @@ where
     let mut input_string = String::new();
     let (_a, b) = match app.mode {
         AppMode::Global => (write!(input_string, "").unwrap(), 0),
-        AppMode::Command => (write!(input_string, "{}", app.command_bar.buffer()).unwrap(), app.command_bar.input_cursor_position()),
-        AppMode::Insert => (write!(input_string, "{}", app.insert_bar.buffer()).unwrap(), app.insert_bar.input_cursor_position()) 
+        AppMode::Command => (
+            write!(input_string, "{}", app.command_bar.buffer()).unwrap(),
+            app.command_bar.input_cursor_position(),
+        ),
+        AppMode::Insert => (
+            write!(input_string, "{}", app.insert_bar.buffer()).unwrap(),
+            app.insert_bar.input_cursor_position(),
+        ),
     };
 
     let title = format!("{} Mode:", app.mode);

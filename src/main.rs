@@ -7,13 +7,13 @@ mod event;
 mod gist;
 mod ui;
 
-use std::str::SplitWhitespace;
 use crate::event::Key;
-use app::{App, AppMode, WorkItem, VimCommandBarResult};
+use app::{App, AppMode, VimCommandBarResult, WorkItem};
 use backtrace::Backtrace;
 use clap::App as ClapApp;
 use config::ClientConfig;
 use std::error::Error;
+use std::str::SplitWhitespace;
 
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
@@ -100,10 +100,7 @@ fn panic_hook(info: &PanicInfo<'_>) {
     }
 }
 
-
 pub fn perform_cmd(app: &mut App, cmd: String) -> Result<(), failure::Error> {
-    
-
     Ok(())
 }
 
@@ -132,7 +129,6 @@ pub fn unescape(text: &str) -> String {
     unescaped
 }
 
-
 pub fn parse_text_parts(parts: &mut SplitWhitespace) -> Option<String> {
     // Parse text parts and nest them together
     let mut text_raw = String::new();
@@ -145,14 +141,12 @@ pub fn parse_text_parts(parts: &mut SplitWhitespace) -> Option<String> {
         text_raw.push_str(text_part);
     }
 
-    if text_raw.is_empty()
-    {
+    if text_raw.is_empty() {
         None
     } else {
         Some(text_raw)
     }
 }
-
 
 fn main() -> Result<(), Box<dyn Error>> {
     panic::set_hook(Box::new(|info| {
@@ -203,12 +197,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Ok(_r) => {}
                 Err(_e) => {}
             },
-            _=> match terminal.show_cursor() {
+            _ => match terminal.show_cursor() {
                 Ok(_r) => {}
                 Err(_e) => {}
             },
         };
-        
+
         let cursor_offset = if app.size.height > ui::SMALL_TERMINAL_HEIGHT {
             2
         } else {
@@ -222,7 +216,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         io::stdout().flush().ok();
 
-        app.tasks.sort_by(|a,b| a.status.partial_cmp(&b.status).unwrap());
+        app.tasks
+            .sort_by(|a, b| a.status.partial_cmp(&b.status).unwrap());
 
         match events.next()? {
             event::Event::Input(key) => {
@@ -257,12 +252,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                                     w.wont_fix()
                                 }
                             }
-                            Key::Char('i') =>
-                            {
-                                app.mode = AppMode::Insert
-                            }
-                            Key::Char(':') =>
-                            {
+                            Key::Char('i') => app.mode = AppMode::Insert,
+                            Key::Char(':') => {
                                 app.mode = AppMode::Command;
                                 app.command_bar.handle_input(key);
                             }
@@ -274,9 +265,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                                     "Test".to_string(),
                                     Some("Test".to_string()),
                                 );
-                    
-                                let list_gist =
-                                    ListGist::get_update_list_gist(&app.client_config.client_secret).unwrap();
+
+                                let list_gist = ListGist::get_update_list_gist(
+                                    &app.client_config.client_secret,
+                                )
+                                .unwrap();
                                 let file = list_gist
                                     ._search_url_gist(&app.client_config.client_id)
                                     .unwrap();
@@ -284,38 +277,38 @@ fn main() -> Result<(), Box<dyn Error>> {
                             }
                             Key::Up => {
                                 let next_index =
-                                on_up_press_handler(&app.tasks, Some(app.selected_index));
+                                    on_up_press_handler(&app.tasks, Some(app.selected_index));
                                 app.selected_index = next_index;
                             }
                             Key::Down => {
                                 let next_index =
-                                        on_down_press_handler(&app.tasks, Some(app.selected_index));
-                                        app.selected_index = next_index;
+                                    on_down_press_handler(&app.tasks, Some(app.selected_index));
+                                app.selected_index = next_index;
                             }
                             Key::Ctrl('d') => {
                                 // Move these to global things
                                 app.tasks.remove(app.selected_index);
-                                let next_index = on_up_press_handler(&app.tasks, Some(app.selected_index));
-        
+                                let next_index =
+                                    on_up_press_handler(&app.tasks, Some(app.selected_index));
+
                                 app.selected_index = next_index;
                             }
-                            _=> {},
+                            _ => {}
                         };
-                    },
-                    AppMode::Insert =>  {
-                        match app.insert_bar.handle_input(key) {
-                            VimCommandBarResult::Finished(task) => {
-                                let mut work_item = WorkItem::new();
-                                work_item.content = Some(task);
-                                app.tasks.push(work_item);
-                                app.tasks.sort_by(|a,b| a.status.partial_cmp(&b.status).unwrap());
-                                app.selected_index = app.tasks.len() - 1;
-                                app.mode = AppMode::Global;
-                                app.insert_bar.clear();
-                            }
-                            VimCommandBarResult::Aborted => app.mode = AppMode::Global,
-                            _=> {}
+                    }
+                    AppMode::Insert => match app.insert_bar.handle_input(key) {
+                        VimCommandBarResult::Finished(task) => {
+                            let mut work_item = WorkItem::new();
+                            work_item.content = Some(task);
+                            app.tasks.push(work_item);
+                            app.tasks
+                                .sort_by(|a, b| a.status.partial_cmp(&b.status).unwrap());
+                            app.selected_index = app.tasks.len() - 1;
+                            app.mode = AppMode::Global;
+                            app.insert_bar.clear();
                         }
+                        VimCommandBarResult::Aborted => app.mode = AppMode::Global,
+                        _ => {}
                     },
                     AppMode::Command => {
                         match app.command_bar.handle_input(key) {
@@ -326,14 +319,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                                     Some(c) => &c[1..],
                                     None => return Ok(()),
                                 };
-                            
+
                                 match c {
-                                    "q" =>  {
+                                    "q" => {
                                         close_application()?;
                                         break;
-                                    },
+                                    }
                                     "t" => {
-                                        // these are task based commands? 
+                                        // these are task based commands?
                                         let task_action = match tokens.next() {
                                             Some(c) => c,
                                             None => return Ok(()),
@@ -344,19 +337,21 @@ fn main() -> Result<(), Box<dyn Error>> {
                                                 // this a modification actions so what we do is replace the current selected item
                                                 let index = tokens.next().unwrap();
                                                 match parse_text_parts(&mut tokens) {
-                                                    Some(v) => app.update_work_item_text(index.parse::<usize>().unwrap(), &v),
+                                                    Some(v) => app.update_work_item_text(
+                                                        index.parse::<usize>().unwrap(),
+                                                        &v,
+                                                    ),
                                                     _ => {}
                                                 };
-                                            },
-                                            task_action @ _ => {},
+                                            }
+                                            task_action @ _ => {}
                                         }
-
                                     }
-                                    c @ _ => {},
+                                    c @ _ => {}
                                 };
                             }
                             VimCommandBarResult::Aborted => app.mode = AppMode::Global,
-                            _=> {}
+                            _ => {}
                         }
                     }
                 };

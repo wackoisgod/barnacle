@@ -2,18 +2,16 @@ extern crate chrono;
 use self::AppFilterMode::*;
 use super::config::ClientConfig;
 use super::{gist::get_gist_file, gist::ListGist};
+use crate::event::Key;
 use chrono::prelude::*;
 use num_enum::TryFromPrimitive;
-use serde_derive::{Deserialize, Serialize};
-use std::{
-    fmt,
-};
-use tui::layout::Rect;
 use ropey::Rope;
-use crate::event::Key;
+use serde_derive::{Deserialize, Serialize};
 use std::convert::TryInto;
-use unicode_width::{UnicodeWidthChar};
+use std::fmt;
 use std::fmt::Write;
+use tui::layout::Rect;
+use unicode_width::UnicodeWidthChar;
 
 fn compute_character_width(character: char) -> u16 {
     UnicodeWidthChar::width(character)
@@ -68,34 +66,35 @@ impl VimCommandBar {
                 write!(result, "{}", self.buffer).unwrap();
                 self.clear();
                 VimCommandBarResult::Finished(result)
-            },
+            }
             Key::Backspace => {
                 match (self.buffer.len_chars() == 0, self.input_idx == 0) {
                     (true, _) => return VimCommandBarResult::Aborted,
-                    (false, true) => {},
+                    (false, true) => {}
                     (false, false) => {
-                        self.input_cursor_position -= compute_character_width(self.buffer.char(self.input_idx - 1));
+                        self.input_cursor_position -=
+                            compute_character_width(self.buffer.char(self.input_idx - 1));
                         self.buffer.remove(self.input_idx - 1..self.input_idx);
                         self.input_idx -= 1;
-                    },
-                }                
+                    }
+                }
                 VimCommandBarResult::StillEditing
-            },
+            }
             Key::Delete => {
                 let len = self.buffer.len_chars();
                 if self.input_idx < len {
                     self.buffer.remove(self.input_idx..self.input_idx + 1);
                 }
                 VimCommandBarResult::StillEditing
-            },
+            }
             Key::Ctrl('u') => {
                 self.clear();
-                VimCommandBarResult::StillEditing               
-            },
+                VimCommandBarResult::StillEditing
+            }
             Key::Ctrl('a') => {
                 self.goto_being();
-                VimCommandBarResult::StillEditing               
-            },
+                VimCommandBarResult::StillEditing
+            }
             _ => VimCommandBarResult::StillEditing,
         }
     }
@@ -143,51 +142,52 @@ impl VimInsertBar {
         match key {
             Key::Left => {
                 if self.buffer.len_chars() > 0 && self.input_idx > 0 {
-                    let last_c = self.buffer.char(self.input_idx - 1);                    
+                    let last_c = self.buffer.char(self.input_idx - 1);
                     self.input_idx -= 1;
                     self.input_cursor_position -= compute_character_width(last_c);
                 }
                 VimCommandBarResult::StillEditing
-            },
+            }
             Key::Char(c) => {
                 self.buffer.insert_char(self.input_idx, c);
                 self.input_idx += 1;
-                self.input_cursor_position += compute_character_width(c); 
+                self.input_cursor_position += compute_character_width(c);
                 VimCommandBarResult::StillEditing
-            },
+            }
             Key::Enter => {
                 let mut result = String::new();
                 write!(result, "{}", self.buffer).unwrap();
                 self.clear();
                 VimCommandBarResult::Finished(result)
-            },
+            }
             Key::Backspace => {
                 match (self.buffer.len_chars() == 0, self.input_idx == 0) {
                     (true, _) => return VimCommandBarResult::Aborted,
-                    (false, true) => {},
+                    (false, true) => {}
                     (false, false) => {
-                        self.input_cursor_position -= compute_character_width(self.buffer.char(self.input_idx - 1));
+                        self.input_cursor_position -=
+                            compute_character_width(self.buffer.char(self.input_idx - 1));
                         self.buffer.remove(self.input_idx - 1..self.input_idx);
                         self.input_idx -= 1;
-                    },
+                    }
                 }
                 VimCommandBarResult::StillEditing
-            },
+            }
             Key::Delete => {
                 let len = self.buffer.len_chars();
                 if self.input_idx < len {
                     self.buffer.remove(self.input_idx..self.input_idx + 1);
                 }
                 VimCommandBarResult::StillEditing
-            },
+            }
             Key::Ctrl('u') => {
-                self.clear();                
+                self.clear();
                 VimCommandBarResult::StillEditing
-            },
+            }
             Key::Ctrl('a') => {
                 self.goto_being();
                 VimCommandBarResult::StillEditing
-            },
+            }
             _ => VimCommandBarResult::StillEditing,
         }
     }
@@ -203,7 +203,6 @@ impl VimInsertBar {
         self.input_cursor_position = 0;
     }
 }
-
 
 #[derive(Clone, Eq, Ord, PartialEq, PartialOrd, Debug, Copy, Serialize, Deserialize)]
 pub enum ItemStatus {
@@ -379,7 +378,7 @@ impl App {
             client_config: Default::default(),
             command_bar: VimCommandBar::new(),
             insert_bar: VimInsertBar::new(),
-            mode: AppMode::Global
+            mode: AppMode::Global,
         }
     }
 
@@ -397,7 +396,7 @@ impl App {
         match self.mode {
             AppMode::Global => 0,
             AppMode::Command => self.command_bar.input_cursor_position(),
-            AppMode::Insert => self.insert_bar.input_cursor_position()
+            AppMode::Insert => self.insert_bar.input_cursor_position(),
         }
     }
 
