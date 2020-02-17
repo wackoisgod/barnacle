@@ -1,7 +1,7 @@
 extern crate chrono;
 use self::AppFilterMode::*;
 use super::config::ClientConfig;
-use super::{gist::get_gist_file, gist::ListGist};
+use super::{gist::get_gist_file, gist::ListGist, gist::GistUpdate};
 use crate::event::Key;
 use chrono::prelude::*;
 use num_enum::TryFromPrimitive;
@@ -12,6 +12,7 @@ use std::fmt;
 use std::fmt::Write;
 use tui::layout::Rect;
 use unicode_width::UnicodeWidthChar;
+
 
 fn compute_character_width(character: char) -> u16 {
     UnicodeWidthChar::width(character)
@@ -366,6 +367,8 @@ pub struct App {
     pub command_bar: VimCommandBar,
     pub insert_bar: VimInsertBar,
     pub mode: AppMode,
+    pub current_project: Option<String>,
+    pub current_file_list: Option<ListGist>,
 }
 
 impl App {
@@ -379,17 +382,75 @@ impl App {
             command_bar: VimCommandBar::new(),
             insert_bar: VimInsertBar::new(),
             mode: AppMode::Global,
+            current_project: None,
+            current_file_list: None,
         }
     }
 
+    pub fn init(&mut self) {
+        self.current_file_list = Some(ListGist::get_update_list_gist(&self.client_config.client_secret).unwrap());
+        self.current_project = self.client_config.current_project.to_owned();
+    }
+
     pub fn sync(&mut self) {
-        let list_gist = ListGist::get_update_list_gist(&self.client_config.client_secret).unwrap();
-        let file = list_gist
-            .get_url_gist_file(&self.client_config.client_id)
-            .unwrap();
-        let data = get_gist_file(&file, &self.client_config.client_secret).unwrap();
-        let actual_data: Vec<WorkItem> = serde_json::from_str(&data).unwrap();
-        self.tasks = actual_data;
+        if let (Some(list), Some(proj)) = (&self.current_file_list, &self.current_project) {
+            match list.get_url_gist_file(&self.client_config.client_id, &proj) {
+                Ok(gist) => {
+                    let data = get_gist_file(&gist, &self.client_config.client_secret).unwrap();
+                    let actual_data: Vec<WorkItem> = serde_json::from_str(&data).unwrap();
+                    self.tasks = actual_data;
+                }
+                _=> {}
+            }
+        }
+    }
+
+    pub fn select_project(&mut self, project: &String) {
+        let projs = self.get_projects();
+        if projs.iter().any(|v| v == project) {
+            self.current_project = Some(project.to_string())
+        }
+
+        self.client_config.current_project = self.current_project.to_owned();
+        self.client_config.save_config();
+    }
+
+    pub fn new_project(&mut self, project: &String) {
+        self.current_project = Some(project.to_string());
+        self.tasks.drain(..);
+        self.save_project(true);
+
+        self.client_config.current_project = self.current_project.to_owned();
+        self.client_config.save_config();
+    }
+
+    pub fn save_project(&mut self, sync: bool) {
+        if let (Some(ref proj), Some(list)) = (&self.current_project, &self.current_file_list) {
+            let s = ::serde_json::to_string(&self.tasks).unwrap();
+            let gg = GistUpdate::new(
+                s,
+                proj.to_string(),
+                proj.to_string(),
+                Some(proj.to_string()),
+            );
+
+            let file = list
+                .search_url_gist(&self.client_config.client_id)
+                .unwrap();
+            gg.update(&file, &self.client_config.client_secret);
+            if sync {
+                self.init();
+            }
+        }
+    }
+
+    pub fn get_projects(&self) -> Vec<String> {
+        if let Some(list) = &self.current_file_list {
+            let gist = list.search_gist(&self.client_config.client_id).unwrap();
+            return gist.files.iter().map(|(_, file)| file.name.clone()).collect::<Vec<String>>();
+        }
+
+        Vec::new()
     }
 
     pub fn get_cursor_position(&self) -> u16 {

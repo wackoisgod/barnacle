@@ -179,6 +179,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut app = App::new();
     app.client_config = client_config;
 
+    app.init();
     app.sync();
 
     terminal.clear()?;
@@ -258,22 +259,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                                 app.command_bar.handle_input(key);
                             }
                             Key::Char('o') => {
-                                let s = ::serde_json::to_string(&app.tasks).unwrap();
-                                let gg = GistUpdate::new(
-                                    s,
-                                    "Test".to_string(),
-                                    "Test".to_string(),
-                                    Some("Test".to_string()),
-                                );
-
-                                let list_gist = ListGist::get_update_list_gist(
-                                    &app.client_config.client_secret,
-                                )
-                                .unwrap();
-                                let file = list_gist
-                                    ._search_url_gist(&app.client_config.client_id)
-                                    .unwrap();
-                                gg.update(&file, &app.client_config.client_secret)?;
+                                app.save_project(false);
                             }
                             Key::Up => {
                                 let next_index =
@@ -343,6 +329,27 @@ fn main() -> Result<(), Box<dyn Error>> {
                                                     ),
                                                     _ => {}
                                                 };
+                                            }
+                                            task_action @ _ => {}
+                                        }
+                                    }
+                                    "p" => {
+                                        let task_action = match tokens.next() {
+                                            Some(c) => c,
+                                            None => return Ok(()),
+                                        };
+
+                                        match task_action {
+                                            "new" => {
+                                                // this a modification actions so what we do is replace the current selected item
+                                                let name = tokens.next().unwrap();
+                                                app.new_project(&String::from(name));
+                                            }
+                                            "open" => {
+                                                // this a modification actions so what we do is replace the current selected item
+                                                let name = tokens.next().unwrap();
+                                                app.select_project(&String::from(name));
+                                                app.sync();
                                             }
                                             task_action @ _ => {}
                                         }

@@ -87,7 +87,7 @@ pub struct FilePost {
 // }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct ResponseGist {
+pub struct ResponseGist {
     #[serde(rename = "id")]
     pub id: String,
     #[serde(rename = "url")]
@@ -99,7 +99,7 @@ struct ResponseGist {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct FileGist {
+pub struct FileGist {
     #[serde(rename = "filename")]
     pub name: String,
     #[serde(rename = "type")]
@@ -113,7 +113,7 @@ struct FileGist {
 }
 
 pub struct ListGist {
-    list: Vec<ResponseGist>,
+    pub list: Vec<ResponseGist>,
 }
 
 pub fn get_gist_file(url: &str, token: &str) -> Result<String> {
@@ -162,13 +162,7 @@ impl ListGist {
         Err(Error::from("unsuccessful get list gist"))
     }
 
-    // pub fn sync() -> Result<ListGist> {
-    //     let list_gist = ListGist::get_update_list_gist().unwrap();
-    //     list_gist.write().unwrap();
-    //     Ok(list_gist)
-    // }
-
-    pub fn _search_url_gist<T: AsRef<str>>(&self, id: T) -> Result<String> {
+    pub fn search_url_gist<T: AsRef<str>>(&self, id: T) -> Result<String> {
         if id.as_ref().len() < 5 {
             return Err(Error::from("id invalid"));
         }
@@ -180,59 +174,28 @@ impl ListGist {
         Err(Error::from("gist file not exist"))
     }
 
-    // pub fn search_raw_url_gist<T: AsRef<str>>(&self, id: T) -> Result<String> {
-    //     if id.as_ref().len() < 5 {
-    //         return Err(Error::from("id len most be bigger than 5"));
-    //     }
-    //     for gist in self.list.clone() {
-    //         if gist.id.starts_with(id.as_ref()) {
-    //             for (_, v) in gist.files {
-    //                 return Ok(v.raw_url);
-    //             }
-    //         }
-    //     }
-    //     return Err(Error::from("gist not exist"));
-    // }
+    pub fn search_gist<T: AsRef<str>>(&self, id: T) -> Result<ResponseGist> {
+        if id.as_ref().len() < 5 {
+            return Err(Error::from("id invalid"));
+        }
+        for gist in self.list.clone() {
+            if gist.id.starts_with(id.as_ref()) {
+                return Ok(gist);
+            }
+        }
+        Err(Error::from("gist file not exist"))
+    }
 
-    // pub fn get_name_gist_file<T: AsRef<str>>(&self, id: T) -> Result<String> {
-    //     for gist in self.list.clone() {
-    //         if gist.id == id.as_ref() {
-    //             for (_, v) in gist.files {
-    //                 return Ok(v.name);
-    //             }
-    //         }
-    //     }
-    //     return Err(Error::from("id not exist"));
-    // }
-
-    pub fn get_url_gist_file<T: AsRef<str>>(&self, id: T) -> Result<String> {
+    pub fn get_url_gist_file<T: AsRef<str>>(&self, id: T, file: T) -> Result<String> {
         for gist in self.list.clone() {
             if gist.id == id.as_ref() {
                 for (_, v) in gist.files {
-                    return Ok(v.raw_url);
+                    if v.name == file.as_ref() {
+                        return Ok(v.raw_url);
+                    }
                 }
             }
         }
         Err(Error::from("id not exist"))
     }
-
-    // pub fn print(&self, verbose: bool) -> Result<()> {
-    //     let mut count = 0;
-    //     for gist in self.list.clone() {
-    //         println!(
-    //             "{}) {}",
-    //             count,
-    //             gist.desc.unwrap_or("None Description".to_owned()),
-    //         );
-    //         println!("{}", gist.id);
-    //         if verbose {
-    //             for (_, v) in gist.files {
-    //                 println!("{}", v.raw_url);
-    //                 println!("---------------------------------------------------------");
-    //             }
-    //         }
-    //         count += 1;
-    //     }
-    //     Ok(())
-    // }
 }

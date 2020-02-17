@@ -26,6 +26,7 @@ pub const BANNER: &str = r#"
 pub struct ClientConfig {
     pub client_id: String,
     pub client_secret: String,
+    pub current_project: Option<String>,
 }
 
 pub struct ConfigPaths {
@@ -37,6 +38,7 @@ impl ClientConfig {
         ClientConfig {
             client_id: "".to_string(),
             client_secret: "".to_string(),
+            current_project: Some("".to_string()),
         }
     }
 
@@ -67,6 +69,15 @@ impl ClientConfig {
         }
     }
 
+    pub fn save_config(&mut self) -> Result<(), failure::Error> {
+        let paths = self.get_or_build_paths()?;
+        let content_yml = serde_yaml::to_string(&self)?;
+        let mut new_config = fs::File::create(&paths.config_file_path)?;
+        write!(new_config, "{}", content_yml)?;
+
+        Ok(())
+    }
+
     pub fn load_config(&mut self) -> Result<(), failure::Error> {
         let paths = self.get_or_build_paths()?;
         if paths.config_file_path.exists() {
@@ -75,6 +86,7 @@ impl ClientConfig {
 
             self.client_id = config_yml.client_id;
             self.client_secret = config_yml.client_secret;
+            self.current_project = config_yml.current_project;
 
             Ok(())
         } else {
@@ -111,6 +123,7 @@ impl ClientConfig {
             let config_yml = ClientConfig {
                 client_id: client_id.trim().to_string(),
                 client_secret: client_secret.trim().to_string(),
+                current_project: Some("inbox".to_string()),
             };
 
             let content_yml = serde_yaml::to_string(&config_yml)?;
@@ -120,6 +133,7 @@ impl ClientConfig {
 
             self.client_id = config_yml.client_id;
             self.client_secret = config_yml.client_secret;
+            self.current_project = config_yml.current_project;
 
             Ok(())
         }
