@@ -7,6 +7,7 @@ mod event;
 mod gist;
 mod ui;
 
+use std::str::SplitWhitespace;
 use crate::event::Key;
 use app::{App, AppMode, WorkItem, VimCommandBarResult};
 use backtrace::Backtrace;
@@ -105,6 +106,53 @@ pub fn perform_cmd(app: &mut App, cmd: String) -> Result<(), failure::Error> {
 
     Ok(())
 }
+
+const TEXT_PART_BOUNDARY: char = '"';
+const TEXT_PART_ESCAPE: char = '\\';
+
+pub fn unescape(text: &str) -> String {
+    // Pre-reserve a byte-aware required capacity as to avoid heap resizes (30% performance \
+    //   gain relative to initializing this with a zero-capacity)
+    let mut unescaped = String::with_capacity(text.as_bytes().len());
+    let mut characters = text.chars();
+
+    while let Some(character) = characters.next() {
+        if character == '\\' {
+            // Found escaped character
+            match characters.next() {
+                Some('n') => unescaped.push('\n'),
+                Some('\"') => unescaped.push('\"'),
+                _ => unescaped.push(character),
+            };
+        } else {
+            unescaped.push(character);
+        }
+    }
+
+    unescaped
+}
+
+
+pub fn parse_text_parts(parts: &mut SplitWhitespace) -> Option<String> {
+    // Parse text parts and nest them together
+    let mut text_raw = String::new();
+
+    while let Some(text_part) = parts.next() {
+        if !text_raw.is_empty() {
+            text_raw.push_str(" ");
+        }
+
+        text_raw.push_str(text_part);
+    }
+
+    if text_raw.is_empty()
+    {
+        None
+    } else {
+        Some(text_raw)
+    }
+}
+
 
 fn main() -> Result<(), Box<dyn Error>> {
     panic::set_hook(Box::new(|info| {
@@ -282,6 +330,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                                 match c {
                                     "q" =>  {
                                         close_application()?;
+                                        break;
                                     },
                                     "t" => {
                                         // these are task based commands? 
@@ -292,12 +341,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                                         match task_action {
                                             "mod" => {
-                                                use std::fmt::Write;
-
                                                 // this a modification actions so what we do is replace the current selected item
                                                 let index = tokens.next().unwrap();
-                                                let mut new_info = String::new();
-                                                write!(new_info, "{}", &tokens);
+                                                match parse_text_parts(&mut tokens) {
+                                                    Some(v) => app.update_work_item_text(index.parse::<usize>().unwrap(), &v),
+                                                    _ => {}
+                                                };
                                             },
                                             task_action @ _ => {},
                                         }

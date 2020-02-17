@@ -400,4 +400,10 @@ impl App {
             AppMode::Insert => self.insert_bar.input_cursor_position()
         }
     }
+
+    pub fn update_work_item_text(&mut self, index: usize, content: &String) {
+        if let Some(w) = self.tasks.get_mut(index) {
+            w.content = Some(content.to_string())
+        }
+    }
 }
