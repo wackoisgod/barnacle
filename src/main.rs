@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate error_chain;
-
 mod app;
 mod config;
 mod event;
@@ -30,7 +27,6 @@ use tui::{
     Terminal,
 };
 extern crate serde_json;
-use gist::{get_gist_file, GistUpdate, ListGist};
 
 fn close_application() -> Result<(), failure::Error> {
     disable_raw_mode()?;
@@ -100,35 +96,6 @@ fn panic_hook(info: &PanicInfo<'_>) {
     }
 }
 
-pub fn perform_cmd(app: &mut App, cmd: String) -> Result<(), failure::Error> {
-    Ok(())
-}
-
-const TEXT_PART_BOUNDARY: char = '"';
-const TEXT_PART_ESCAPE: char = '\\';
-
-pub fn unescape(text: &str) -> String {
-    // Pre-reserve a byte-aware required capacity as to avoid heap resizes (30% performance \
-    //   gain relative to initializing this with a zero-capacity)
-    let mut unescaped = String::with_capacity(text.as_bytes().len());
-    let mut characters = text.chars();
-
-    while let Some(character) = characters.next() {
-        if character == '\\' {
-            // Found escaped character
-            match characters.next() {
-                Some('n') => unescaped.push('\n'),
-                Some('\"') => unescaped.push('\"'),
-                _ => unescaped.push(character),
-            };
-        } else {
-            unescaped.push(character);
-        }
-    }
-
-    unescaped
-}
-
 pub fn parse_text_parts(parts: &mut SplitWhitespace) -> Option<String> {
     // Parse text parts and nest them together
     let mut text_raw = String::new();
@@ -148,7 +115,8 @@ pub fn parse_text_parts(parts: &mut SplitWhitespace) -> Option<String> {
     }
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     panic::set_hook(Box::new(|info| {
         panic_hook(info);
     }));
@@ -179,8 +147,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut app = App::new();
     app.client_config = client_config;
 
-    app.init();
-    app.sync();
+    app.init().await;
+    app.sync().await;
 
     terminal.clear()?;
 
@@ -292,6 +260,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             app.selected_index = app.tasks.len() - 1;
                             app.mode = AppMode::Global;
                             app.insert_bar.clear();
+                            app.save_project(false);
                         }
                         VimCommandBarResult::Aborted => app.mode = AppMode::Global,
                         _ => {}
@@ -330,7 +299,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                                                     _ => {}
                                                 };
                                             }
-                                            task_action @ _ => {}
+                                            _task_action @ _ => {}
                                         }
                                     }
                                     "p" => {
@@ -343,18 +312,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                                             "new" => {
                                                 // this a modification actions so what we do is replace the current selected item
                                                 let name = tokens.next().unwrap();
-                                                app.new_project(&String::from(name));
+                                                app.new_project(&String::from(name)).await;
                                             }
                                             "open" => {
                                                 // this a modification actions so what we do is replace the current selected item
                                                 let name = tokens.next().unwrap();
                                                 app.select_project(&String::from(name));
-                                                app.sync();
+                                                app.sync().await;
                                             }
-                                            task_action @ _ => {}
+                                            _task_action @ _ => {}
                                         }
                                     }
-                                    c @ _ => {}
+                                    _c @ _ => {}
                                 };
                             }
                             VimCommandBarResult::Aborted => app.mode = AppMode::Global,

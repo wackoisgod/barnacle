@@ -6,13 +6,13 @@ use crate::event::Key;
 use chrono::prelude::*;
 use num_enum::TryFromPrimitive;
 use ropey::Rope;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 use std::fmt;
 use std::fmt::Write;
 use tui::layout::Rect;
 use unicode_width::UnicodeWidthChar;
-
+use tokio::task;
 
 fn compute_character_width(character: char) -> u16 {
     UnicodeWidthChar::width(character)
@@ -387,16 +387,16 @@ impl App {
         }
     }
 
-    pub fn init(&mut self) {
-        self.current_file_list = Some(ListGist::get_update_list_gist(&self.client_config.client_secret).unwrap());
+    pub async fn init(&mut self) {
+        self.current_file_list = Some(ListGist::get_update_list_gist(&self.client_config.client_secret).await.unwrap());
         self.current_project = self.client_config.current_project.to_owned();
     }
 
-    pub fn sync(&mut self) {
+    pub async fn sync(&mut self) {
         if let (Some(list), Some(proj)) = (&self.current_file_list, &self.current_project) {
             match list.get_url_gist_file(&self.client_config.client_id, &proj) {
                 Ok(gist) => {
-                    let data = get_gist_file(&gist, &self.client_config.client_secret).unwrap();
+                    let data = get_gist_file(&gist, &self.client_config.client_secret).await.unwrap();
                     let actual_data: Vec<WorkItem> = serde_json::from_str(&data).unwrap();
                     self.tasks = actual_data;
                 }
@@ -415,7 +415,7 @@ impl App {
         self.client_config.save_config();
     }
 
-    pub fn new_project(&mut self, project: &String) {
+    pub async fn new_project(&mut self, project: &String) {
         self.current_project = Some(project.to_string());
         self.tasks.drain(..);
         self.save_project(true);
@@ -426,21 +426,31 @@ impl App {
 
     pub fn save_project(&mut self, sync: bool) {
         if let (Some(ref proj), Some(list)) = (&self.current_project, &self.current_file_list) {
-            let s = ::serde_json::to_string(&self.tasks).unwrap();
-            let gg = GistUpdate::new(
-                s,
-                proj.to_string(),
-                proj.to_string(),
-                Some(proj.to_string()),
-            );
 
-            let file = list
-                .search_url_gist(&self.client_config.client_id)
-                .unwrap();
-            gg.update(&file, &self.client_config.client_secret);
-            if sync {
-                self.init();
-            }
+            let s = ::serde_json::to_string(&self.tasks).unwrap();
+            let client_id = self.client_config.client_id.to_owned();
+            let client_secret = self.client_config.client_secret.to_owned();
+            let proj_copy = proj.clone();
+            let list_copy = list.clone();
+
+            task::spawn(async move {
+                let gg = GistUpdate::new(
+                    s,
+                    proj_copy.to_string(),
+                    proj_copy.to_string(),
+                    Some(proj_copy.to_string()),
+                );
+
+                let file = list_copy
+                    .search_url_gist(&client_id)
+                    .unwrap();
+
+                gg.update(&file, &client_secret).await
+            });
+                       
+            // if sync {
+            //     self.init().await;
+            // }
         }
     }
 

@@ -1,15 +1,9 @@
-use reqwest::{Client, Response};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-use std::io::prelude::*;
-
-mod errors {
-    // Create the Error, ErrorKind, ResultExt, and Result types
-    error_chain! {}
-}
-
-use errors::*;
+use yukikaze::{matsu};
+use yukikaze::client::{Client, Request};
+use anyhow::Result;
+use anyhow::anyhow;
 
 pub const URL: &str = "https://api.github.com/gists";
 
@@ -40,15 +34,17 @@ impl GistUpdate {
             files: hm,
         }
     }
-    pub fn update(&self, url: &str, token: &str) -> Result<String> {
-        let _resp: Response = Client::new()
-            .patch(url)
+    pub async fn update(&self, url: &str, token: &str) -> Result<String> {
+        let client = Client::default();
+        let mut resp: Request = Request::put(url)?
             .bearer_auth(token)
-            .json(self)
-            .send()
-            .chain_err(|| "update gist faild")?;
-        //let gist_spot: GistPost = resp.json().chain_err(|| "convert to GistPost faild")?;
-        Ok("gist_spot".to_string())
+            .json(self)?;
+
+        *resp.method_mut() = http::Method::PATCH;
+        
+        let mut response = matsu!(client.send(resp)).expect("Not timedout").expect("Successful");
+        let buf =  matsu!(response.text()).expect("To read HTML");
+        Ok(buf.to_string())
     }
 }
 
@@ -63,28 +59,6 @@ pub struct GistPost {
 pub struct FilePost {
     pub content: String,
 }
-
-// impl GistPost {
-//     pub fn new(cont: String, public: bool, desc: String, name: String) -> Self {
-//         let mut hm: HashMap<String, FilePost> = HashMap::new();
-//         hm.insert(name, FilePost { content: cont });
-//         GistPost {
-//             description: desc,
-//             public: public,
-//             files: hm,
-//         }
-//     }
-//     pub fn post(&self) -> Result<GistPost> {
-//         let mut resp: Response = Client::new()
-//             .post(URL)
-//             .bearer_auth(&*TOKEN)
-//             .json(self)
-//             .send()
-//             .chain_err(|| "post gist unsuccess !")?;
-//         let rs_data: GistPost = resp.json().chain_err(|| "convert to json error")?;
-//         Ok(rs_data)
-//     }
-// }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ResponseGist {
@@ -112,22 +86,23 @@ pub struct FileGist {
     pub size: u32,
 }
 
+#[derive(Debug, Clone)]
 pub struct ListGist {
     pub list: Vec<ResponseGist>,
 }
 
-pub fn get_gist_file(url: &str, token: &str) -> Result<String> {
-    let mut resp: Response = Client::new()
-        .get(url)
-        .bearer_auth(token)
-        .send()
-        .chain_err(|| format!("failed get gist file {}", url))?;
-    if resp.status().is_success() {
-        let mut buf = String::new();
-        resp.read_to_string(&mut buf).unwrap();
-        return Ok(buf);
+pub async fn get_gist_file(url: &str, token: &str) -> Result<String> {
+    let client = Client::default();
+    let resp: Request = Request::get(url)?
+                .bearer_auth(token)
+                .empty();
+
+    let mut response = matsu!(client.send(resp)).expect("Not timedout").expect("Successful");
+    if response.is_success() {
+         let buf =  matsu!(response.text()).expect("To read HTML");
+         return Ok(buf);
     }
-    Err(Error::from("unsuccessful get gist file"))
+    Err(anyhow!("Failed to get list"))
 }
 
 impl ListGist {
@@ -135,55 +110,41 @@ impl ListGist {
         ListGist { list }
     }
 
-    // pub fn read() -> Result<ListGist> {
-    //     let path_file = &utils::path_file_in_home(LIST_GIST_FILE_NAME).unwrap();
-    //     let out = utils::read_file(path_file).unwrap();
-    //     let gists: Vec<ResponseGist> = serde_json::from_str(&out)
-    //         .chain_err(|| format!("failed read file {}", path_file.to_str().unwrap()))?;
-    //     return Ok(ListGist::new(gists));
-    // }
-
-    // fn write(&self) -> Result<()> {
-    //     let path_file = utils::path_file_in_home(LIST_GIST_FILE_NAME).unwrap();
-    //     let list_string = serde_json::to_string(&self.list).chain_err(|| "can't get list")?;
-    //     return utils::write_file(path_file, list_string);
-    // }
-
-    pub fn get_update_list_gist(token: &str) -> Result<ListGist> {
-        let mut resp: Response = Client::new()
-            .get(URL)
-            .bearer_auth(token)
-            .send()
-            .chain_err(|| "failed get list")?;
-        if resp.status().is_success() {
-            let list_gist: Vec<ResponseGist> = resp.json().chain_err(|| "can't read gist list")?;
+    pub async fn get_update_list_gist(token: &str) -> Result<ListGist> {
+        let client = Client::default();
+        let resp: Request = Request::get(URL)?
+                    .bearer_auth(token)
+                    .empty();
+        let mut response = matsu!(client.send(resp)).expect("Not timedout").expect("Successful");
+        if response.is_success() {
+            let list_gist: Vec<ResponseGist> = matsu!(response.json()).expect("To read HTML");
             return Ok(ListGist::new(list_gist));
         }
-        Err(Error::from("unsuccessful get list gist"))
+        Err(anyhow!("unsuccessful get list gist"))
     }
 
     pub fn search_url_gist<T: AsRef<str>>(&self, id: T) -> Result<String> {
         if id.as_ref().len() < 5 {
-            return Err(Error::from("id invalid"));
+            return Err(anyhow!("id invalid"));
         }
         for gist in self.list.clone() {
             if gist.id.starts_with(id.as_ref()) {
                 return Ok(gist.url);
             }
         }
-        Err(Error::from("gist file not exist"))
+        Err(anyhow!("gist file not exist"))
     }
 
     pub fn search_gist<T: AsRef<str>>(&self, id: T) -> Result<ResponseGist> {
         if id.as_ref().len() < 5 {
-            return Err(Error::from("id invalid"));
+            return Err(anyhow!("id invalid"));
         }
         for gist in self.list.clone() {
             if gist.id.starts_with(id.as_ref()) {
                 return Ok(gist);
             }
         }
-        Err(Error::from("gist file not exist"))
+        Err(anyhow!("gist file not exist"))
     }
 
     pub fn get_url_gist_file<T: AsRef<str>>(&self, id: T, file: T) -> Result<String> {
@@ -196,6 +157,6 @@ impl ListGist {
                 }
             }
         }
-        Err(Error::from("id not exist"))
+        Err(anyhow!("id not exist"))
     }
 }
