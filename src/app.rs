@@ -1,5 +1,4 @@
 extern crate chrono;
-use self::AppFilterMode::*;
 use super::config::ClientConfig;
 use super::{gist::get_gist_file, gist::GistUpdate, gist::ListGist};
 use crate::event::Key;
@@ -44,10 +43,6 @@ impl VimCommandBar {
 
     pub fn buffer(&self) -> &Rope {
         &self.buffer
-    }
-
-    pub fn input_idx(&self) -> usize {
-        self.input_idx
     }
 
     pub fn input_cursor_position(&self) -> u16 {
@@ -130,10 +125,6 @@ impl VimInsertBar {
 
     pub fn buffer(&self) -> &Rope {
         &self.buffer
-    }
-
-    pub fn input_idx(&self) -> usize {
-        self.input_idx
     }
 
     pub fn input_cursor_position(&self) -> u16 {
@@ -227,12 +218,6 @@ pub enum AppFilterMode {
     WontFix,
 }
 
-impl AppFilterMode {
-    pub fn iterator() -> impl Iterator<Item = AppFilterMode> {
-        [All, Started, Finished, WontFix].iter().copied()
-    }
-}
-
 impl fmt::Display for AppFilterMode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -307,7 +292,7 @@ mod option_date_format {
     use chrono::{DateTime, Local, TimeZone};
     use serde::{self, Deserialize, Deserializer, Serializer};
 
-    const FORMAT: &'static str = "%Y-%m-%d %H:%M:%S";
+    const FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
     pub fn serialize<S>(
         date: &Option<DateTime<Local>>,
@@ -449,7 +434,7 @@ impl App {
         self.client_config.save_config();
     }
 
-    pub fn save_project(&mut self, sync: bool) {
+    pub fn save_project(&mut self, _sync: bool) {
         if let (Some(ref proj), Some(list)) =
             (&self.current_project, &self.current_file_list)
         {

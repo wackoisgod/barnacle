@@ -334,7 +334,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                                     _ => {}
                                                 };
                                             }
-                                            _task_action @ _ => {}
+                                            _ => {}
                                         }
                                     }
                                     "p" => {
@@ -362,10 +362,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                                 );
                                                 app.sync().await;
                                             }
-                                            _task_action @ _ => {}
+                                            _ => {}
                                         }
                                     }
-                                    _c @ _ => {}
+                                    _ => {}
                                 };
                             }
                             VimCommandBarResult::Aborted => {
