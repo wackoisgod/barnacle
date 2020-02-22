@@ -1,7 +1,7 @@
 extern crate chrono;
 use self::AppFilterMode::*;
 use super::config::ClientConfig;
-use super::{gist::get_gist_file, gist::ListGist, gist::GistUpdate};
+use super::{gist::get_gist_file, gist::GistUpdate, gist::ListGist};
 use crate::event::Key;
 use chrono::prelude::*;
 use num_enum::TryFromPrimitive;
@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 use std::fmt;
 use std::fmt::Write;
+use tokio::task;
 use tui::layout::Rect;
 use unicode_width::UnicodeWidthChar;
-use tokio::task;
 
 fn compute_character_width(character: char) -> u16 {
     UnicodeWidthChar::width(character)
@@ -73,8 +73,9 @@ impl VimCommandBar {
                     (true, _) => return VimCommandBarResult::Aborted,
                     (false, true) => {}
                     (false, false) => {
-                        self.input_cursor_position -=
-                            compute_character_width(self.buffer.char(self.input_idx - 1));
+                        self.input_cursor_position -= compute_character_width(
+                            self.buffer.char(self.input_idx - 1),
+                        );
                         self.buffer.remove(self.input_idx - 1..self.input_idx);
                         self.input_idx -= 1;
                     }
@@ -145,7 +146,8 @@ impl VimInsertBar {
                 if self.buffer.len_chars() > 0 && self.input_idx > 0 {
                     let last_c = self.buffer.char(self.input_idx - 1);
                     self.input_idx -= 1;
-                    self.input_cursor_position -= compute_character_width(last_c);
+                    self.input_cursor_position -=
+                        compute_character_width(last_c);
                 }
                 VimCommandBarResult::StillEditing
             }
@@ -166,8 +168,9 @@ impl VimInsertBar {
                     (true, _) => return VimCommandBarResult::Aborted,
                     (false, true) => {}
                     (false, false) => {
-                        self.input_cursor_position -=
-                            compute_character_width(self.buffer.char(self.input_idx - 1));
+                        self.input_cursor_position -= compute_character_width(
+                            self.buffer.char(self.input_idx - 1),
+                        );
                         self.buffer.remove(self.input_idx - 1..self.input_idx);
                         self.input_idx -= 1;
                     }
@@ -205,7 +208,9 @@ impl VimInsertBar {
     }
 }
 
-#[derive(Clone, Eq, Ord, PartialEq, PartialOrd, Debug, Copy, Serialize, Deserialize)]
+#[derive(
+    Clone, Eq, Ord, PartialEq, PartialOrd, Debug, Copy, Serialize, Deserialize,
+)]
 pub enum ItemStatus {
     Started,
     Finished,
@@ -274,7 +279,10 @@ mod normal_date_format {
 
     const FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
-    pub fn serialize<S>(date: &DateTime<Local>, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(
+        date: &DateTime<Local>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -282,7 +290,9 @@ mod normal_date_format {
         serializer.serialize_str(&s)
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Local>, D::Error>
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<DateTime<Local>, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -299,7 +309,10 @@ mod option_date_format {
 
     const FORMAT: &'static str = "%Y-%m-%d %H:%M:%S";
 
-    pub fn serialize<S>(date: &Option<DateTime<Local>>, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(
+        date: &Option<DateTime<Local>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -310,7 +323,9 @@ mod option_date_format {
         }
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<DateTime<Local>>, D::Error>
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<Option<DateTime<Local>>, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -388,19 +403,29 @@ impl App {
     }
 
     pub async fn init(&mut self) {
-        self.current_file_list = Some(ListGist::get_update_list_gist(&self.client_config.client_secret).await.unwrap());
+        self.current_file_list = Some(
+            ListGist::get_update_list_gist(&self.client_config.client_secret)
+                .await
+                .unwrap(),
+        );
         self.current_project = self.client_config.current_project.to_owned();
     }
 
     pub async fn sync(&mut self) {
-        if let (Some(list), Some(proj)) = (&self.current_file_list, &self.current_project) {
+        if let (Some(list), Some(proj)) =
+            (&self.current_file_list, &self.current_project)
+        {
             match list.get_url_gist_file(&self.client_config.client_id, &proj) {
                 Ok(gist) => {
-                    let data = get_gist_file(&gist, &self.client_config.client_secret).await.unwrap();
-                    let actual_data: Vec<WorkItem> = serde_json::from_str(&data).unwrap();
+                    let data =
+                        get_gist_file(&gist, &self.client_config.client_secret)
+                            .await
+                            .unwrap();
+                    let actual_data: Vec<WorkItem> =
+                        serde_json::from_str(&data).unwrap();
                     self.tasks = actual_data;
                 }
-                _=> {}
+                _ => {}
             }
         }
     }
@@ -425,8 +450,9 @@ impl App {
     }
 
     pub fn save_project(&mut self, sync: bool) {
-        if let (Some(ref proj), Some(list)) = (&self.current_project, &self.current_file_list) {
-
+        if let (Some(ref proj), Some(list)) =
+            (&self.current_project, &self.current_file_list)
+        {
             let s = ::serde_json::to_string(&self.tasks).unwrap();
             let client_id = self.client_config.client_id.to_owned();
             let client_secret = self.client_config.client_secret.to_owned();
@@ -441,13 +467,11 @@ impl App {
                     Some(proj_copy.to_string()),
                 );
 
-                let file = list_copy
-                    .search_url_gist(&client_id)
-                    .unwrap();
+                let file = list_copy.search_url_gist(&client_id).unwrap();
 
                 gg.update(&file, &client_secret).await
             });
-                       
+
             // if sync {
             //     self.init().await;
             // }
@@ -457,7 +481,11 @@ impl App {
     pub fn get_projects(&self) -> Vec<String> {
         if let Some(list) = &self.current_file_list {
             let gist = list.search_gist(&self.client_config.client_id).unwrap();
-            return gist.files.iter().map(|(_, file)| file.name.clone()).collect::<Vec<String>>();
+            return gist
+                .files
+                .iter()
+                .map(|(_, file)| file.name.clone())
+                .collect::<Vec<String>>();
         }
 
         Vec::new()

@@ -55,13 +55,18 @@ pub fn get_percentage_width(width: u16, percentage: f32) -> u16 {
     (f32::from(width) * percentage) as u16
 }
 
-pub fn draw_input_and_help_box<B>(f: &mut Frame<B>, app: &App, layout_chunk: Rect)
-where
+pub fn draw_input_and_help_box<B>(
+    f: &mut Frame<B>,
+    app: &App,
+    layout_chunk: Rect,
+) where
     B: Backend,
 {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(95), Constraint::Percentage(5)].as_ref())
+        .constraints(
+            [Constraint::Percentage(95), Constraint::Percentage(5)].as_ref(),
+        )
         .split(layout_chunk);
 
     let mut input_string = String::new();
@@ -206,9 +211,13 @@ fn draw_table<B>(
         // TODO: May want to change the style if its been sitting to many days
         if let Some(_title_idx) = header.get_index(ColumnId::Content) {
             match item.org_item.status {
-                ItemStatus::WontFix => style = style.fg(Color::Red).modifier(Modifier::CROSSED_OUT),
+                ItemStatus::WontFix => {
+                    style = style.fg(Color::Red).modifier(Modifier::CROSSED_OUT)
+                }
                 ItemStatus::Started => style = style.fg(Color::LightGreen),
-                ItemStatus::Finished => style = style.fg(Color::Rgb(149, 66, 245)),
+                ItemStatus::Finished => {
+                    style = style.fg(Color::Rgb(149, 66, 245))
+                }
                 _ => {}
             }
         }

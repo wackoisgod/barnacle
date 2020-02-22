@@ -16,7 +16,10 @@ use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     style::Print,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{
+        disable_raw_mode, enable_raw_mode, EnterAlternateScreen,
+        LeaveAlternateScreen,
+    },
 };
 use std::{
     io::{self, stdout, Write},
@@ -35,7 +38,10 @@ fn close_application() -> Result<(), failure::Error> {
     Ok(())
 }
 
-pub fn on_down_press_handler<T>(selection_data: &[T], selection_index: Option<usize>) -> usize {
+pub fn on_down_press_handler<T>(
+    selection_data: &[T],
+    selection_index: Option<usize>,
+) -> usize {
     match selection_index {
         Some(selection_index) => {
             if !selection_data.is_empty() {
@@ -52,7 +58,10 @@ pub fn on_down_press_handler<T>(selection_data: &[T], selection_index: Option<us
     }
 }
 
-pub fn on_up_press_handler<T>(selection_data: &[T], selection_index: Option<usize>) -> usize {
+pub fn on_up_press_handler<T>(
+    selection_data: &[T],
+    selection_index: Option<usize>,
+) -> usize {
     match selection_index {
         Some(selection_index) => {
             if !selection_data.is_empty() {
@@ -80,7 +89,8 @@ fn panic_hook(info: &PanicInfo<'_>) {
             },
         };
 
-        let stacktrace: String = format!("{:?}", Backtrace::new()).replace('\n', "\n\r");
+        let stacktrace: String =
+            format!("{:?}", Backtrace::new()).replace('\n', "\n\r");
 
         disable_raw_mode().unwrap();
         execute!(
@@ -181,7 +191,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let hieght = terminal.get_frame().size().height;
 
         // Put the cursor back inside the input box
-        terminal.set_cursor(cursor_offset + app.get_cursor_position(), hieght - 3)?;
+        terminal.set_cursor(
+            cursor_offset + app.get_cursor_position(),
+            hieght - 3,
+        )?;
 
         io::stdout().flush().ok();
 
@@ -207,17 +220,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     AppMode::Global => {
                         match key {
                             Key::Char('s') => {
-                                if let Some(w) = app.tasks.get_mut(app.selected_index) {
+                                if let Some(w) =
+                                    app.tasks.get_mut(app.selected_index)
+                                {
                                     w.start()
                                 }
                             }
                             Key::Char('f') => {
-                                if let Some(w) = app.tasks.get_mut(app.selected_index) {
+                                if let Some(w) =
+                                    app.tasks.get_mut(app.selected_index)
+                                {
                                     w.fin()
                                 }
                             }
                             Key::Char('w') => {
-                                if let Some(w) = app.tasks.get_mut(app.selected_index) {
+                                if let Some(w) =
+                                    app.tasks.get_mut(app.selected_index)
+                                {
                                     w.wont_fix()
                                 }
                             }
@@ -230,20 +249,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 app.save_project(false);
                             }
                             Key::Up => {
-                                let next_index =
-                                    on_up_press_handler(&app.tasks, Some(app.selected_index));
+                                let next_index = on_up_press_handler(
+                                    &app.tasks,
+                                    Some(app.selected_index),
+                                );
                                 app.selected_index = next_index;
                             }
                             Key::Down => {
-                                let next_index =
-                                    on_down_press_handler(&app.tasks, Some(app.selected_index));
+                                let next_index = on_down_press_handler(
+                                    &app.tasks,
+                                    Some(app.selected_index),
+                                );
                                 app.selected_index = next_index;
                             }
                             Key::Ctrl('d') => {
                                 // Move these to global things
                                 app.tasks.remove(app.selected_index);
-                                let next_index =
-                                    on_up_press_handler(&app.tasks, Some(app.selected_index));
+                                let next_index = on_up_press_handler(
+                                    &app.tasks,
+                                    Some(app.selected_index),
+                                );
 
                                 app.selected_index = next_index;
                             }
@@ -255,14 +280,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             let mut work_item = WorkItem::new();
                             work_item.content = Some(task);
                             app.tasks.push(work_item);
-                            app.tasks
-                                .sort_by(|a, b| a.status.partial_cmp(&b.status).unwrap());
+                            app.tasks.sort_by(|a, b| {
+                                a.status.partial_cmp(&b.status).unwrap()
+                            });
                             app.selected_index = app.tasks.len() - 1;
                             app.mode = AppMode::Global;
                             app.insert_bar.clear();
                             app.save_project(false);
                         }
-                        VimCommandBarResult::Aborted => app.mode = AppMode::Global,
+                        VimCommandBarResult::Aborted => {
+                            app.mode = AppMode::Global
+                        }
                         _ => {}
                     },
                     AppMode::Command => {
@@ -290,12 +318,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                         match task_action {
                                             "mod" => {
                                                 // this a modification actions so what we do is replace the current selected item
-                                                let index = tokens.next().unwrap();
-                                                match parse_text_parts(&mut tokens) {
-                                                    Some(v) => app.update_work_item_text(
-                                                        index.parse::<usize>().unwrap(),
-                                                        &v,
-                                                    ),
+                                                let index =
+                                                    tokens.next().unwrap();
+                                                match parse_text_parts(
+                                                    &mut tokens,
+                                                ) {
+                                                    Some(v) => app
+                                                        .update_work_item_text(
+                                                            index
+                                                                .parse::<usize>(
+                                                                )
+                                                                .unwrap(),
+                                                            &v,
+                                                        ),
                                                     _ => {}
                                                 };
                                             }
@@ -311,13 +346,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                         match task_action {
                                             "new" => {
                                                 // this a modification actions so what we do is replace the current selected item
-                                                let name = tokens.next().unwrap();
-                                                app.new_project(&String::from(name)).await;
+                                                let name =
+                                                    tokens.next().unwrap();
+                                                app.new_project(&String::from(
+                                                    name,
+                                                ))
+                                                .await;
                                             }
                                             "open" => {
                                                 // this a modification actions so what we do is replace the current selected item
-                                                let name = tokens.next().unwrap();
-                                                app.select_project(&String::from(name));
+                                                let name =
+                                                    tokens.next().unwrap();
+                                                app.select_project(
+                                                    &String::from(name),
+                                                );
                                                 app.sync().await;
                                             }
                                             _task_action @ _ => {}
@@ -326,7 +368,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                     _c @ _ => {}
                                 };
                             }
-                            VimCommandBarResult::Aborted => app.mode = AppMode::Global,
+                            VimCommandBarResult::Aborted => {
+                                app.mode = AppMode::Global
+                            }
                             _ => {}
                         }
                     }

@@ -82,7 +82,8 @@ impl ClientConfig {
         let paths = self.get_or_build_paths()?;
         if paths.config_file_path.exists() {
             let config_string = fs::read_to_string(&paths.config_file_path)?;
-            let config_yml: ClientConfig = serde_yaml::from_str(&config_string)?;
+            let config_yml: ClientConfig =
+                serde_yaml::from_str(&config_string)?;
 
             self.client_id = config_yml.client_id;
             self.client_secret = config_yml.client_secret;
