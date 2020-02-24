@@ -400,7 +400,9 @@ impl App {
         if let (Some(list), Some(proj)) =
             (&self.current_file_list, &self.current_project)
         {
-            if let Ok(gist) = list.get_url_gist_file(&self.client_config.client_id, &proj) {
+            if let Ok(gist) =
+                list.get_url_gist_file(&self.client_config.client_id, &proj)
+            {
                 let data =
                     get_gist_file(&gist, &self.client_config.client_secret)
                         .await

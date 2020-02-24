@@ -5,13 +5,13 @@ mod gist;
 mod ui;
 
 use crate::event::Key;
+use anyhow::Result;
 use app::{App, AppMode, VimCommandBarResult, WorkItem};
 use backtrace::Backtrace;
 use clap::App as ClapApp;
 use config::ClientConfig;
 use std::error::Error;
 use std::str::SplitWhitespace;
-use anyhow::Result;
 
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
@@ -321,13 +321,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                                 // this a modification actions so what we do is replace the current selected item
                                                 let index =
                                                     tokens.next().unwrap();
-                                                if let Some(v) = parse_text_parts(&mut tokens) {
+                                                if let Some(v) =
+                                                    parse_text_parts(
+                                                        &mut tokens,
+                                                    )
+                                                {
                                                     app.update_work_item_text(
-                                                            index
-                                                                .parse::<usize>(
-                                                                )
-                                                                .unwrap(),
-                                                            &v,
+                                                        index
+                                                            .parse::<usize>()
+                                                            .unwrap(),
+                                                        &v,
                                                     );
                                                 };
                                             }
