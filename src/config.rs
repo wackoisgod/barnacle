@@ -1,5 +1,6 @@
 use dirs;
-use failure::err_msg;
+use anyhow::anyhow;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -42,7 +43,7 @@ impl ClientConfig {
         }
     }
 
-    pub fn get_or_build_paths(&self) -> Result<ConfigPaths, failure::Error> {
+    pub fn get_or_build_paths(&self) -> Result<ConfigPaths> {
         match dirs::home_dir() {
             Some(home) => {
                 let path = Path::new(&home);
@@ -65,11 +66,11 @@ impl ClientConfig {
 
                 Ok(paths)
             }
-            None => Err(err_msg("No $HOME directory found for client config")),
+            None => Err(anyhow!("No $HOME directory found for client config")),
         }
     }
 
-    pub fn save_config(&mut self) -> Result<(), failure::Error> {
+    pub fn save_config(&mut self) -> Result<()> {
         let paths = self.get_or_build_paths()?;
         let content_yml = serde_yaml::to_string(&self)?;
         let mut new_config = fs::File::create(&paths.config_file_path)?;
@@ -78,7 +79,7 @@ impl ClientConfig {
         Ok(())
     }
 
-    pub fn load_config(&mut self) -> Result<(), failure::Error> {
+    pub fn load_config(&mut self) -> Result<()> {
         let paths = self.get_or_build_paths()?;
         if paths.config_file_path.exists() {
             let config_string = fs::read_to_string(&paths.config_file_path)?;

@@ -11,9 +11,7 @@ serde_json = "1.0.48"
 serde_yaml = "0.8.11"
 serde = { version = "1.0.104", features = ["derive"] }
 clap = "2.33.0"
-failure = "0.1.6"
 tui = { version = "0.8.0", features = ["crossterm"], default-features = false }
-clipboard = "0.5.0"
 crossterm =  "0.15"
 unicode-width = "0.1.7"
 chrono = "0.4"

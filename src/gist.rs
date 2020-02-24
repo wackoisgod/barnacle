@@ -39,7 +39,7 @@ impl GistUpdate {
             files: hm,
         }
     }
-    pub async fn update(&self, url: &str, token: &str) -> Result<String> {
+    pub async fn update(&self, url: &str, token: &str) -> Result<()> {
         let client = Client::default();
         let mut resp: Request =
             Request::put(url)?.bearer_auth(token).json(self)?;
@@ -49,8 +49,8 @@ impl GistUpdate {
         let mut response = matsu!(client.send(resp))
             .expect("Not timedout")
             .expect("Successful");
-        let buf = matsu!(response.text()).expect("To read HTML");
-        Ok(buf.to_string())
+        matsu!(response.text()).expect("To read HTML");
+        Ok(())
     }
 }
 

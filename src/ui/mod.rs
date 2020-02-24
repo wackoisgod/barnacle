@@ -43,6 +43,7 @@ pub struct TableHeaderItem<'a> {
     width: u16,
 }
 
+#[allow(dead_code)]
 pub struct TableItem<'a> {
     id: String,
     org_item: &'a WorkItem,
@@ -107,7 +108,6 @@ where
                 id: ColumnId::Content,
                 text: "Content",
                 width: get_percentage_width(layout_chunk.width, 8.0 / 9.0),
-                ..Default::default()
             },
             TableHeaderItem {
                 text: "Started",
@@ -118,7 +118,6 @@ where
                 id: ColumnId::Days,
                 text: "Days",
                 width: get_percentage_width(layout_chunk.width, 1.6 / 6.0),
-                ..Default::default()
             },
         ],
     };
@@ -138,7 +137,7 @@ where
                 } else {
                     "-".to_string()
                 },
-                if let Some(_) = m.finished_time {
+                if m.finished_time.is_some() {
                     "-".to_string()
                 } else {
                     Local::now()
@@ -223,7 +222,7 @@ fn draw_table<B>(
         }
 
         // TODO: May want to change the style if its been sitting to many days
-        if let Some(_) = header.get_index(ColumnId::Days) {}
+        if header.get_index(ColumnId::Days).is_some() {}
 
         // Next check if the item is under selection.
         if Some(i) == selected_index.checked_sub(offset) {

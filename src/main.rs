@@ -11,6 +11,7 @@ use clap::App as ClapApp;
 use config::ClientConfig;
 use std::error::Error;
 use std::str::SplitWhitespace;
+use anyhow::Result;
 
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
@@ -31,7 +32,7 @@ use tui::{
 };
 extern crate serde_json;
 
-fn close_application() -> Result<(), failure::Error> {
+fn close_application() -> Result<()> {
     disable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, LeaveAlternateScreen, DisableMouseCapture)?;
@@ -110,7 +111,7 @@ pub fn parse_text_parts(parts: &mut SplitWhitespace) -> Option<String> {
     // Parse text parts and nest them together
     let mut text_raw = String::new();
 
-    while let Some(text_part) = parts.next() {
+    for text_part in parts {
         if !text_raw.is_empty() {
             text_raw.push_str(" ");
         }
@@ -314,24 +315,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                             Some(c) => c,
                                             None => return Ok(()),
                                         };
-
+                                        #[allow(clippy::single_match)]
                                         match task_action {
                                             "mod" => {
                                                 // this a modification actions so what we do is replace the current selected item
                                                 let index =
                                                     tokens.next().unwrap();
-                                                match parse_text_parts(
-                                                    &mut tokens,
-                                                ) {
-                                                    Some(v) => app
-                                                        .update_work_item_text(
+                                                if let Some(v) = parse_text_parts(&mut tokens) {
+                                                    app.update_work_item_text(
                                                             index
                                                                 .parse::<usize>(
                                                                 )
                                                                 .unwrap(),
                                                             &v,
-                                                        ),
-                                                    _ => {}
+                                                    );
                                                 };
                                             }
                                             _ => {}

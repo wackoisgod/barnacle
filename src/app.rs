@@ -80,7 +80,7 @@ impl VimCommandBar {
             Key::Delete => {
                 let len = self.buffer.len_chars();
                 if self.input_idx < len {
-                    self.buffer.remove(self.input_idx..self.input_idx + 1);
+                    self.buffer.remove(self.input_idx..=self.input_idx);
                 }
                 VimCommandBarResult::StillEditing
             }
@@ -171,7 +171,7 @@ impl VimInsertBar {
             Key::Delete => {
                 let len = self.buffer.len_chars();
                 if self.input_idx < len {
-                    self.buffer.remove(self.input_idx..self.input_idx + 1);
+                    self.buffer.remove(self.input_idx..=self.input_idx);
                 }
                 VimCommandBarResult::StillEditing
             }
@@ -400,22 +400,20 @@ impl App {
         if let (Some(list), Some(proj)) =
             (&self.current_file_list, &self.current_project)
         {
-            match list.get_url_gist_file(&self.client_config.client_id, &proj) {
-                Ok(gist) => {
-                    let data =
-                        get_gist_file(&gist, &self.client_config.client_secret)
-                            .await
-                            .unwrap();
-                    let actual_data: Vec<WorkItem> =
-                        serde_json::from_str(&data).unwrap();
-                    self.tasks = actual_data;
-                }
-                _ => {}
+            if let Ok(gist) = list.get_url_gist_file(&self.client_config.client_id, &proj) {
+                let data =
+                    get_gist_file(&gist, &self.client_config.client_secret)
+                        .await
+                        .unwrap();
+                let actual_data: Vec<WorkItem> =
+                    serde_json::from_str(&data).unwrap();
+                self.tasks = actual_data;
             }
         }
     }
 
-    pub fn select_project(&mut self, project: &String) {
+    #[allow(unused_must_use)]
+    pub fn select_project(&mut self, project: &str) {
         let projs = self.get_projects();
         if projs.iter().any(|v| v == project) {
             self.current_project = Some(project.to_string())
@@ -425,7 +423,8 @@ impl App {
         self.client_config.save_config();
     }
 
-    pub async fn new_project(&mut self, project: &String) {
+    #[allow(unused_must_use)]
+    pub async fn new_project(&mut self, project: &str) {
         self.current_project = Some(project.to_string());
         self.tasks.drain(..);
         self.save_project(true);
@@ -484,7 +483,7 @@ impl App {
         }
     }
 
-    pub fn update_work_item_text(&mut self, index: usize, content: &String) {
+    pub fn update_work_item_text(&mut self, index: usize, content: &str) {
         if let Some(w) = self.tasks.get_mut(index) {
             w.content = Some(content.to_string())
         }
