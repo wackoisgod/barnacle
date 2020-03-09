@@ -129,8 +129,11 @@ where
         ],
     };
 
-    let messages = app
-        .tasks
+    let mut current_view = app.get_view();
+
+    current_view.sort_by(|a, b| a.status.partial_cmp(&b.status).unwrap());
+
+    let messages = current_view
         .iter()
         .enumerate()
         .map(|(i, m)| TableItem {

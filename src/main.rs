@@ -6,7 +6,7 @@ mod ui;
 
 use crate::event::Key;
 use anyhow::Result;
-use app::{App, AppMode, VimCommandBarResult, WorkItem};
+use app::{App, AppMode, VimCommand, VimCommandBarResult, WorkItem};
 use backtrace::Backtrace;
 use clap::App as ClapApp;
 use config::ClientConfig;
@@ -108,25 +108,6 @@ fn panic_hook(info: &PanicInfo<'_>) {
     }
 }
 
-pub fn parse_text_parts(parts: &mut SplitWhitespace) -> Option<String> {
-    // Parse text parts and nest them together
-    let mut text_raw = String::new();
-
-    for text_part in parts {
-        if !text_raw.is_empty() {
-            text_raw.push_str(" ");
-        }
-
-        text_raw.push_str(text_part);
-    }
-
-    if text_raw.is_empty() {
-        None
-    } else {
-        Some(text_raw)
-    }
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     panic::set_hook(Box::new(|info| {
@@ -200,8 +181,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         io::stdout().flush().ok();
 
-        app.tasks
-            .sort_by(|a, b| a.status.partial_cmp(&b.status).unwrap());
+        let mut current_view = app.get_view();
+        current_view.sort_by(|a, b| a.status.partial_cmp(&b.status).unwrap());
 
         match events.next()? {
             event::Event::Input(key) => {
@@ -223,9 +204,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         match key {
                             Key::Char('s') => {
                                 if let Some(w) =
-                                    app.tasks.get_mut(app.selected_index)
+                                    current_view.get_mut(app.selected_index)
                                 {
-                                    w.start()
+                                    app.start_task(&w.id.as_ref().unwrap())
                                 }
                             }
                             Key::Char('k') => {
@@ -233,25 +214,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             }
                             Key::Char('f') => {
                                 if let Some(w) =
-                                    app.tasks.get_mut(app.selected_index)
+                                    current_view.get_mut(app.selected_index)
                                 {
-                                    w.finish()
+                                    app.finish_task(&w.id.as_ref().unwrap())
                                 }
                             }
                             Key::Char('w') => {
                                 if let Some(w) =
-                                    app.tasks.get_mut(app.selected_index)
+                                    current_view.get_mut(app.selected_index)
                                 {
-                                    w.wont_fix()
+                                    app.wont_task(&w.id.as_ref().unwrap())
                                 }
                             }
                             Key::Char('i') => app.mode = AppMode::Insert,
                             Key::Char(':') => {
                                 app.mode = AppMode::Command;
                                 app.command_bar.handle_input(key);
-                            }
-                            Key::Char('o') => {
-                                app.save_project(false);
                             }
                             Key::Up => {
                                 let next_index = on_up_press_handler(
@@ -265,16 +243,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                     &app.tasks,
                                     Some(app.selected_index),
                                 );
-                                app.selected_index = next_index;
-                            }
-                            Key::Ctrl('d') => {
-                                // Move these to global things
-                                app.tasks.remove(app.selected_index);
-                                let next_index = on_up_press_handler(
-                                    &app.tasks,
-                                    Some(app.selected_index),
-                                );
-
                                 app.selected_index = next_index;
                             }
                             _ => {}
@@ -292,7 +260,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             app.selected_index = app.tasks.len() - 1;
                             app.mode = AppMode::Global;
                             app.insert_bar.clear();
-                            app.save_project(false);
+                            app.save_project(false, false);
                         }
                         VimCommandBarResult::Aborted => {
                             app.mode = AppMode::Global
@@ -301,74 +269,47 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     },
                     AppMode::Command => {
                         match app.command_bar.handle_input(key) {
-                            // I don't like this code here but for now its fine
                             VimCommandBarResult::Finished(cmd) => {
-                                let mut tokens = cmd.split_whitespace();
-                                let c = match tokens.next() {
-                                    Some(c) => &c[1..],
-                                    None => return Ok(()),
-                                };
-
+                                let c = VimCommand::from(cmd);
                                 match c {
-                                    "q" => {
+                                    VimCommand::Quit => {
                                         close_application()?;
                                         break;
                                     }
-                                    "t" => {
-                                        // these are task based commands?
-                                        let task_action = match tokens.next() {
-                                            Some(c) => c,
-                                            None => return Ok(()),
-                                        };
-                                        #[allow(clippy::single_match)]
-                                        match task_action {
-                                            "mod" => {
-                                                // this a modification actions so what we do is replace the current selected item
-                                                let index =
-                                                    tokens.next().unwrap();
-                                                if let Some(v) =
-                                                    parse_text_parts(
-                                                        &mut tokens,
-                                                    )
-                                                {
-                                                    app.update_work_item_text(
-                                                        index
-                                                            .parse::<usize>()
-                                                            .unwrap(),
-                                                        &v,
-                                                    );
-                                                };
-                                            }
-                                            _ => {}
+                                    VimCommand::ProjectSaveAndQuit => {
+                                        app.save_project(true, false);
+                                        close_application()?;
+                                        break;
+                                    }
+                                    VimCommand::ProjectSave => {
+                                        app.save_project(false, false);
+                                    }
+                                    VimCommand::TaskModify(index, content) => {
+                                        if let Some(w) =
+                                            current_view.get_mut(index)
+                                        {
+                                            app.update_work_item_text(
+                                                &w.id.as_ref().unwrap(),
+                                                &content,
+                                            );
                                         }
                                     }
-                                    "p" => {
-                                        let task_action = match tokens.next() {
-                                            Some(c) => c,
-                                            None => return Ok(()),
-                                        };
-
-                                        match task_action {
-                                            "new" => {
-                                                // this a modification actions so what we do is replace the current selected item
-                                                let name =
-                                                    tokens.next().unwrap();
-                                                app.new_project(&String::from(
-                                                    name,
-                                                ))
-                                                .await;
-                                            }
-                                            "open" => {
-                                                // this a modification actions so what we do is replace the current selected item
-                                                let name =
-                                                    tokens.next().unwrap();
-                                                app.select_project(
-                                                    &String::from(name),
-                                                );
-                                                app.sync().await;
-                                            }
-                                            _ => {}
+                                    VimCommand::TaskDelete(index) => {
+                                        if let Some(w) =
+                                            current_view.get_mut(index)
+                                        {
+                                            app.remove_task(
+                                                &w.id.as_ref().unwrap(),
+                                            )
                                         }
+                                    }
+                                    VimCommand::ProjectNew(name) => {
+                                        app.new_project(&String::from(name))
+                                            .await;
+                                    }
+                                    VimCommand::ProjectOpen(name) => {
+                                        app.select_project(&String::from(name));
+                                        app.sync().await;
                                     }
                                     _ => {}
                                 };

@@ -3,6 +3,8 @@ use super::config::ClientConfig;
 use super::{gist::get_gist_file, gist::GistUpdate, gist::ListGist};
 use crate::event::Key;
 use chrono::prelude::*;
+use core::str::SplitWhitespace;
+use futures::executor;
 use num_enum::TryFromPrimitive;
 use ropey::Rope;
 use serde::{Deserialize, Serialize};
@@ -13,6 +15,87 @@ use tokio::task;
 use tui::layout::Rect;
 use unicode_width::UnicodeWidthChar;
 use uuid::Uuid;
+
+pub fn parse_text_parts(parts: &mut SplitWhitespace) -> Option<String> {
+    // Parse text parts and nest them together
+    let mut text_raw = String::new();
+
+    for text_part in parts {
+        if !text_raw.is_empty() {
+            text_raw.push_str(" ");
+        }
+
+        text_raw.push_str(text_part);
+    }
+
+    if text_raw.is_empty() {
+        None
+    } else {
+        Some(text_raw)
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Hash, Debug)]
+pub enum VimCommand {
+    TaskModify(usize, String),
+    TaskDelete(usize),
+    TaskSetPriority(usize, usize),
+    ProjectNew(String),
+    ProjectOpen(String),
+    ProjectSave,
+    ProjectSaveAndQuit,
+    Quit,
+    None,
+}
+
+impl VimCommand {
+    pub fn from_command(cmd: String) -> VimCommand {
+        let mut tokens = cmd.split_whitespace();
+        let c = match tokens.next() {
+            Some(c) => &c[1..],
+            None => "",
+        };
+
+        match c {
+            "q" => VimCommand::Quit,
+            "w" => VimCommand::ProjectSave,
+            "wq" => VimCommand::ProjectSaveAndQuit,
+            "tmod" => {
+                let index = tokens.next().unwrap();
+                let content = parse_text_parts(&mut tokens)
+                    .unwrap_or(String::from("Invalid"));
+                VimCommand::TaskModify(index.parse::<usize>().unwrap(), content)
+            }
+            "tdel" => {
+                let index = tokens.next().unwrap();
+                VimCommand::TaskDelete(index.parse::<usize>().unwrap())
+            }
+            "tp" => {
+                let index = tokens.next().unwrap();
+                let value = tokens.next().unwrap();
+                VimCommand::TaskSetPriority(
+                    index.parse::<usize>().unwrap(),
+                    value.parse::<usize>().unwrap(),
+                )
+            }
+            "popen" => {
+                let name = tokens.next().unwrap();
+                VimCommand::ProjectOpen(String::from(name))
+            }
+            "pnew" => {
+                let name = tokens.next().unwrap();
+                VimCommand::ProjectNew(String::from(name))
+            }
+            _ => VimCommand::None,
+        }
+    }
+}
+
+impl From<String> for VimCommand {
+    fn from(command: String) -> Self {
+        VimCommand::from_command(command)
+    }
+}
 
 fn compute_character_width(character: char) -> u16 {
     UnicodeWidthChar::width(character)
@@ -348,13 +431,13 @@ impl App {
     pub async fn new_project(&mut self, project: &str) {
         self.current_project = Some(project.to_string());
         self.tasks.drain(..);
-        self.save_project(true);
+        self.save_project(false, true);
 
         self.client_config.current_project = self.current_project.to_owned();
         self.client_config.save_config();
     }
 
-    pub fn save_project(&mut self, _sync: bool) {
+    pub fn save_project(&mut self, wait: bool, sync: bool) {
         if let (Some(ref proj), Some(list)) =
             (&self.current_project, &self.current_file_list)
         {
@@ -363,8 +446,7 @@ impl App {
             let client_secret = self.client_config.client_secret.to_owned();
             let proj_copy = proj.clone();
             let list_copy = list.clone();
-
-            task::spawn(async move {
+            let thing = async move {
                 let gg = GistUpdate::new(
                     s,
                     proj_copy.to_string(),
@@ -375,11 +457,17 @@ impl App {
                 let file = list_copy.search_url_gist(&client_id).unwrap();
 
                 gg.update(&file, &client_secret).await
-            });
+            };
 
-            // if sync {
-            //     self.init().await;
-            // }
+            if wait {
+                executor::block_on(thing);
+            } else {
+                task::spawn(thing);
+            }
+
+            if sync {
+                executor::block_on(self.init());
+            }
         }
     }
 
@@ -404,15 +492,60 @@ impl App {
         }
     }
 
-    pub fn update_work_item_text(&mut self, index: usize, content: &str) {
-        if let Some(w) = self.tasks.get_mut(index) {
-            w.content = Some(content.to_string())
+    pub fn update_work_item_text(&mut self, id: &str, content: &str) {
+        if let Some(task) =
+            self.tasks.iter_mut().find(|s| s.id == Some(id.to_string()))
+        {
+            task.content = Some(content.to_string())
+        }
+    }
+
+    pub fn get_view(&self) -> Vec<WorkItem> {
+        self.tasks
+            .iter()
+            .filter(|l| l.is_valid_for_mode(self.filter))
+            .map(|m| m)
+            .cloned()
+            .collect()
+    }
+
+    pub fn start_task(&mut self, id: &str) {
+        if let Some(task) =
+            self.tasks.iter_mut().find(|s| s.id == Some(id.to_string()))
+        {
+            task.start()
+        }
+    }
+
+    pub fn finish_task(&mut self, id: &str) {
+        if let Some(task) =
+            self.tasks.iter_mut().find(|s| s.id == Some(id.to_string()))
+        {
+            task.finish()
+        }
+    }
+
+    pub fn wont_task(&mut self, id: &str) {
+        if let Some(task) =
+            self.tasks.iter_mut().find(|s| s.id == Some(id.to_string()))
+        {
+            task.wont_fix()
+        }
+    }
+
+    pub fn remove_task(&mut self, id: &str) {
+        if let Some(task) = self
+            .tasks
+            .iter_mut()
+            .position(|s| s.id == Some(id.to_string()))
+        {
+            self.tasks.remove(task);
         }
     }
 
     pub fn fix_all_work_tems(&mut self) {
         for x in self.tasks.iter_mut() {
-            x.id =  Some(Uuid::new_v4().to_string());    
-        }        
+            x.id = Some(Uuid::new_v4().to_string());
+        }
     }
 }
