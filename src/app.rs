@@ -12,6 +12,7 @@ use std::fmt::Write;
 use tokio::task;
 use tui::layout::Rect;
 use unicode_width::UnicodeWidthChar;
+use uuid::Uuid;
 
 fn compute_character_width(character: char) -> u16 {
     UnicodeWidthChar::width(character)
@@ -20,7 +21,7 @@ fn compute_character_width(character: char) -> u16 {
         .unwrap()
 }
 
-pub struct VimCommandBar {
+pub struct VimBar {
     buffer: Rope,
     input_idx: usize,
     input_cursor_position: u16,
@@ -32,91 +33,9 @@ pub enum VimCommandBarResult {
     Finished(String),
 }
 
-impl VimCommandBar {
+impl VimBar {
     pub fn new() -> Self {
-        Self {
-            buffer: Rope::new(),
-            input_idx: 0,
-            input_cursor_position: 0,
-        }
-    }
-
-    pub fn buffer(&self) -> &Rope {
-        &self.buffer
-    }
-
-    pub fn input_cursor_position(&self) -> u16 {
-        self.input_cursor_position
-    }
-
-    pub fn handle_input(&mut self, key: Key) -> VimCommandBarResult {
-        match key {
-            Key::Char(c) => {
-                self.buffer.insert_char(self.input_idx, c);
-                self.input_idx += 1;
-                self.input_cursor_position += compute_character_width(c);
-                VimCommandBarResult::StillEditing
-            }
-            Key::Enter => {
-                let mut result = String::new();
-                write!(result, "{}", self.buffer).unwrap();
-                self.clear();
-                VimCommandBarResult::Finished(result)
-            }
-            Key::Backspace => {
-                match (self.buffer.len_chars() == 0, self.input_idx == 0) {
-                    (true, _) => return VimCommandBarResult::Aborted,
-                    (false, true) => {}
-                    (false, false) => {
-                        self.input_cursor_position -= compute_character_width(
-                            self.buffer.char(self.input_idx - 1),
-                        );
-                        self.buffer.remove(self.input_idx - 1..self.input_idx);
-                        self.input_idx -= 1;
-                    }
-                }
-                VimCommandBarResult::StillEditing
-            }
-            Key::Delete => {
-                let len = self.buffer.len_chars();
-                if self.input_idx < len {
-                    self.buffer.remove(self.input_idx..=self.input_idx);
-                }
-                VimCommandBarResult::StillEditing
-            }
-            Key::Ctrl('u') => {
-                self.clear();
-                VimCommandBarResult::StillEditing
-            }
-            Key::Ctrl('a') => {
-                self.goto_being();
-                VimCommandBarResult::StillEditing
-            }
-            _ => VimCommandBarResult::StillEditing,
-        }
-    }
-
-    pub fn clear(&mut self) {
-        self.buffer = Rope::new();
-        self.input_idx = 0;
-        self.input_cursor_position = 0;
-    }
-
-    pub fn goto_being(&mut self) {
-        self.input_idx = 0;
-        self.input_cursor_position = 0;
-    }
-}
-
-pub struct VimInsertBar {
-    buffer: Rope,
-    input_idx: usize,
-    input_cursor_position: u16,
-}
-
-impl VimInsertBar {
-    pub fn new() -> Self {
-        Self {
+        VimBar {
             buffer: Rope::new(),
             input_idx: 0,
             input_cursor_position: 0,
@@ -339,7 +258,7 @@ impl WorkItem {
         self.finished_time = None;
     }
 
-    pub fn fin(&mut self) {
+    pub fn finish(&mut self) {
         self.finished_time = Some(Local::now());
         self.status = ItemStatus::Finished;
     }
@@ -364,8 +283,8 @@ pub struct App {
     pub selected_index: usize,
     pub filter: AppFilterMode,
     pub client_config: ClientConfig,
-    pub command_bar: VimCommandBar,
-    pub insert_bar: VimInsertBar,
+    pub command_bar: VimBar,
+    pub insert_bar: VimBar,
     pub mode: AppMode,
     pub current_project: Option<String>,
     pub current_file_list: Option<ListGist>,
@@ -379,8 +298,8 @@ impl App {
             selected_index: 0,
             filter: AppFilterMode::All,
             client_config: Default::default(),
-            command_bar: VimCommandBar::new(),
-            insert_bar: VimInsertBar::new(),
+            command_bar: VimBar::new(),
+            insert_bar: VimBar::new(),
             mode: AppMode::Global,
             current_project: None,
             current_file_list: None,
@@ -489,5 +408,11 @@ impl App {
         if let Some(w) = self.tasks.get_mut(index) {
             w.content = Some(content.to_string())
         }
+    }
+
+    pub fn fix_all_work_tems(&mut self) {
+        for x in self.tasks.iter_mut() {
+            x.id =  Some(Uuid::new_v4().to_string());    
+        }        
     }
 }

@@ -16,6 +16,7 @@ pub const SMALL_TERMINAL_HEIGHT: u16 = 45;
 #[derive(PartialEq)]
 pub enum ColumnId {
     None,
+    Id,
     Content,
     Days,
 }
@@ -105,13 +106,19 @@ where
     let header = TableHeader {
         items: vec![
             TableHeaderItem {
+                id: ColumnId::Id,
+                text: "Id",
+                width: get_percentage_width(layout_chunk.width, 0.2 / 9.0),
+                ..Default::default()
+            },
+            TableHeaderItem {
                 id: ColumnId::Content,
                 text: "Content",
                 width: get_percentage_width(layout_chunk.width, 8.0 / 9.0),
             },
             TableHeaderItem {
                 text: "Started",
-                width: get_percentage_width(layout_chunk.width, 0.7 / 9.0),
+                width: get_percentage_width(layout_chunk.width, 0.6 / 9.0),
                 ..Default::default()
             },
             TableHeaderItem {
@@ -126,11 +133,11 @@ where
         .tasks
         .iter()
         .enumerate()
-        .filter(|(_u, l)| l.is_valid_for_mode(app.filter))
         .map(|(i, m)| TableItem {
             id: i.to_string(),
             org_item: m,
             format: vec![
+                i.to_string(),
                 m.content.as_ref().unwrap().to_string(),
                 if let Some(start_time) = m.started_time {
                     start_time.format("%Y-%m-%d").to_string()

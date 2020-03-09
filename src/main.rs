@@ -12,6 +12,7 @@ use clap::App as ClapApp;
 use config::ClientConfig;
 use std::error::Error;
 use std::str::SplitWhitespace;
+use uuid::Uuid;
 
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
@@ -227,11 +228,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                     w.start()
                                 }
                             }
+                            Key::Char('k') => {
+                                app.fix_all_work_tems();
+                            }
                             Key::Char('f') => {
                                 if let Some(w) =
                                     app.tasks.get_mut(app.selected_index)
                                 {
-                                    w.fin()
+                                    w.finish()
                                 }
                             }
                             Key::Char('w') => {
@@ -279,6 +283,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     AppMode::Insert => match app.insert_bar.handle_input(key) {
                         VimCommandBarResult::Finished(task) => {
                             let mut work_item = WorkItem::new();
+                            work_item.id = Some(Uuid::new_v4().to_string());
                             work_item.content = Some(task);
                             app.tasks.push(work_item);
                             app.tasks.sort_by(|a, b| {
