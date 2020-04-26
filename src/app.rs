@@ -78,11 +78,11 @@ impl VimCommand {
                     value.parse::<usize>().unwrap(),
                 )
             }
-            "popen" => {
+            "o" => {
                 let name = tokens.next().unwrap();
                 VimCommand::ProjectOpen(String::from(name))
             }
-            "pnew" => {
+            "n" => {
                 let name = tokens.next().unwrap();
                 VimCommand::ProjectNew(String::from(name))
             }
