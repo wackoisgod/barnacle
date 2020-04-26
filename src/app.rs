@@ -390,11 +390,7 @@ impl App {
     }
 
     pub async fn init(&mut self) {
-        self.current_file_list = Some(
-            ListGist::get_update_list_gist(&self.client_config.client_secret)
-                .await
-                .unwrap(),
-        );
+        self.refresh_projects().await;
         self.current_project = self.client_config.current_project.to_owned();
     }
 
@@ -416,11 +412,21 @@ impl App {
         }
     }
 
+    fn find_and_set_project(&mut self, project: &str) -> bool {
+        self.get_projects().iter().find(|v| v == &project)
+            .and_then(
+                |x| {
+                    self.current_project = Some(project.to_string());
+                    Some(x)
+                }
+            ).is_some()
+    }
+
     #[allow(unused_must_use)]
-    pub fn select_project(&mut self, project: &str) {
-        let projs = self.get_projects();
-        if projs.iter().any(|v| v == project) {
-            self.current_project = Some(project.to_string())
+    pub async fn select_project(&mut self, project: &str) {
+        if !self.find_and_set_project(project) {
+            self.refresh_projects().await;
+            self.find_and_set_project(project);
         }
 
         self.client_config.current_project = self.current_project.to_owned();
@@ -469,6 +475,14 @@ impl App {
                 executor::block_on(self.init());
             }
         }
+    }
+
+    pub async fn refresh_projects(&mut self) {
+        self.current_file_list = Some(
+            ListGist::get_update_list_gist(&self.client_config.client_secret)
+                .await
+                .unwrap(),
+        );
     }
 
     pub fn get_projects(&self) -> Vec<String> {
