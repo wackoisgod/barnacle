@@ -226,6 +226,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                     app.wont_task(&w.id.as_ref().unwrap())
                                 }
                             }
+                            Key::Char('d') => {
+                                if let Some(w) =
+                                    current_view.get_mut(app.selected_index)
+                                {
+                                    app.remove_task(&w.id.as_ref().unwrap())
+                                }
+                            }
+                            Key::Char('p') => {
+                                if app.register.is_some() {
+                                    app.add_task(app.register.as_ref().unwrap().clone());
+                                }
+                            }
                             Key::Char('i') => app.mode = AppMode::Insert,
                             Key::Char(':') => {
                                 app.mode = AppMode::Command;
@@ -251,16 +263,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     AppMode::Insert => match app.insert_bar.handle_input(key) {
                         VimCommandBarResult::Finished(task) => {
                             let mut work_item = WorkItem::new();
-                            work_item.id = Some(Uuid::new_v4().to_string());
                             work_item.content = Some(task);
-                            app.tasks.push(work_item);
-                            app.tasks.sort_by(|a, b| {
-                                a.status.partial_cmp(&b.status).unwrap()
-                            });
-                            app.selected_index = app.tasks.len() - 1;
-                            app.mode = AppMode::Global;
-                            app.insert_bar.clear();
-                            app.save_project(false, false);
+                            app.add_task(work_item);
                         }
                         VimCommandBarResult::Aborted => {
                             app.mode = AppMode::Global

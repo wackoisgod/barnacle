@@ -371,6 +371,7 @@ pub struct App {
     pub mode: AppMode,
     pub current_project: Option<String>,
     pub current_file_list: Option<ListGist>,
+    pub register: Option<WorkItem>,
 }
 
 impl App {
@@ -386,6 +387,7 @@ impl App {
             mode: AppMode::Global,
             current_project: None,
             current_file_list: None,
+            register: None,
         }
     }
 
@@ -533,12 +535,25 @@ impl App {
         }
     }
 
+    pub fn add_task(&mut self, mut item: WorkItem) {
+        item.id = Some(Uuid::new_v4().to_string());
+        self.tasks.push(item);
+        self.tasks.sort_by(|a, b| {
+            a.status.partial_cmp(&b.status).unwrap()
+        });
+        self.selected_index = self.tasks.len() - 1;
+        self.mode = AppMode::Global;
+        self.insert_bar.clear();
+        self.save_project(false, false);
+    }
+
     pub fn remove_task(&mut self, id: &str) {
         if let Some(task) = self
             .tasks
             .iter_mut()
             .position(|s| s.id == Some(id.to_string()))
         {
+            self.register = Some(self.tasks[task].clone());
             self.tasks.remove(task);
         }
     }
