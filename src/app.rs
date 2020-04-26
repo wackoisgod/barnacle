@@ -37,7 +37,7 @@ pub fn parse_text_parts(parts: &mut SplitWhitespace) -> Option<String> {
 
 #[derive(PartialEq, Eq, Clone, Hash, Debug)]
 pub enum VimCommand {
-    TaskModify(usize, String),
+    TaskRename(usize, String),
     TaskDelete(usize),
     TaskSetPriority(usize, usize),
     ProjectNew(String),
@@ -64,7 +64,7 @@ impl VimCommand {
                 let index = tokens.next().unwrap();
                 let content = parse_text_parts(&mut tokens)
                     .unwrap_or(String::from("Invalid"));
-                VimCommand::TaskModify(index.parse::<usize>().unwrap(), content)
+                VimCommand::TaskRename(index.parse::<usize>().unwrap(), content)
             }
             "tdel" => {
                 let index = tokens.next().unwrap();
@@ -543,7 +543,7 @@ impl App {
         }
     }
 
-    pub fn fix_all_work_tems(&mut self) {
+    pub fn fix_all_work_items(&mut self) {
         for x in self.tasks.iter_mut() {
             x.id = Some(Uuid::new_v4().to_string());
         }

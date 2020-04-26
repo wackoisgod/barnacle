@@ -186,12 +186,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         match events.next()? {
             event::Event::Input(key) => {
-                if key == Key::Ctrl('c') {
+                if key == Key::Ctrl('d') {
                     close_application()?;
                     break;
                 }
 
-                if key == Key::Esc {
+                if key == Key::Ctrl('c') || key == Key::Esc {
                     app.insert_bar.clear();
                     app.command_bar.clear();
                     app.mode = AppMode::Global;
@@ -209,8 +209,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                     app.start_task(&w.id.as_ref().unwrap())
                                 }
                             }
-                            Key::Char('k') => {
-                                app.fix_all_work_tems();
+                            Key::Char('x') => {
+                                app.fix_all_work_items();
                             }
                             Key::Char('f') => {
                                 if let Some(w) =
@@ -231,14 +231,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 app.mode = AppMode::Command;
                                 app.command_bar.handle_input(key);
                             }
-                            Key::Up => {
+                            Key::Up | Key::Char('k') => {
                                 let next_index = on_up_press_handler(
                                     &app.tasks,
                                     Some(app.selected_index),
                                 );
                                 app.selected_index = next_index;
                             }
-                            Key::Down => {
+                            Key::Down | Key::Char('j') => {
                                 let next_index = on_down_press_handler(
                                     &app.tasks,
                                     Some(app.selected_index),
@@ -284,7 +284,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                     VimCommand::ProjectSave => {
                                         app.save_project(false, false);
                                     }
-                                    VimCommand::TaskModify(index, content) => {
+                                    VimCommand::TaskRename(index, content) => {
                                         if let Some(w) =
                                             current_view.get_mut(index)
                                         {
@@ -313,6 +313,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                     }
                                     _ => {}
                                 };
+                                app.mode = AppMode::Global
                             }
                             VimCommandBarResult::Aborted => {
                                 app.mode = AppMode::Global
