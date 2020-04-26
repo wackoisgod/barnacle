@@ -226,6 +226,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                     app.wont_task(&w.id.as_ref().unwrap())
                                 }
                             }
+                            Key::Char('r') => {
+                                app.sync().await;
+                            }
                             Key::Char('i') => app.mode = AppMode::Insert,
                             Key::Char(':') => {
                                 app.mode = AppMode::Command;
