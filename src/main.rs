@@ -236,7 +236,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             Key::Char('p') => {
                                 if app.register.is_some() {
                                     app.add_task(app.register.as_ref().unwrap().clone());
-                                }
+                            }
+                            Key::Char('r') => {
+                                app.sync().await;
                             }
                             Key::Char('i') => app.mode = AppMode::Insert,
                             Key::Char(':') => {
@@ -312,7 +314,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                             .await;
                                     }
                                     VimCommand::ProjectOpen(name) => {
-                                        app.select_project(&String::from(name));
+                                        app.select_project(&String::from(name)).await;
                                         app.sync().await;
                                     }
                                     _ => {}

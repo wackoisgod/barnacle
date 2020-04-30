@@ -248,7 +248,11 @@ fn draw_table<B>(
         .map(|h| Constraint::Length(h.width))
         .collect::<Vec<tui::layout::Constraint>>();
 
-    let title = format!("Tasks({}):", app.filter);
+    let title = format!(
+        "{}({}):",
+        app.current_project.as_ref().unwrap_or(&"Tasks".to_string()),
+        app.filter,
+    );
 
     Table::new(header.items.iter().map(|h| h.text), rows)
         .block(
