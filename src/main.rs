@@ -308,7 +308,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                             .await;
                                     }
                                     VimCommand::ProjectOpen(name) => {
-                                        app.select_project(&String::from(name));
+                                        app.select_project(&String::from(name)).await;
                                         app.sync().await;
                                     }
                                     _ => {}
