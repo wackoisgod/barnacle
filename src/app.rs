@@ -436,11 +436,11 @@ impl App {
     #[allow(unused_must_use)]
     pub async fn new_project(&mut self, project: &str) {
         self.current_project = Some(project.to_string());
-        self.tasks.drain(..);
-        self.save_project(false, true);
-
         self.client_config.current_project = self.current_project.to_owned();
         self.client_config.save_config();
+
+        self.tasks.drain(..);
+        self.save_project(false, true);
     }
 
     pub fn save_project(&mut self, wait: bool, sync: bool) {
