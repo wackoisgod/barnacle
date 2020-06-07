@@ -2,9 +2,9 @@ use super::app::{App, AppMode, ItemStatus, WorkItem};
 
 use tui::{
     backend::Backend,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Rect, Alignment},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Paragraph, Row, Table, Text, Widget},
+    widgets::{Block as TuiBlock, Borders, Paragraph, Row, Table, Text, Widget},
     Frame,
 };
 
@@ -57,6 +57,31 @@ pub fn get_percentage_width(width: u16, percentage: f32) -> u16 {
     (f32::from(width) * percentage) as u16
 }
 
+pub fn draw_project_info<B>(
+    f: &mut Frame<B>,
+    app: &App,
+    layout_chunk: Rect,
+) where
+    B: Backend,
+{
+    if let (Some(proj)) =
+            (&app.current_project)
+        {
+            Paragraph::new([Text::raw(proj)].iter())
+			.block(
+				TuiBlock::default()
+					.borders(Borders::ALL)
+					.title(&format!(
+						"{}",
+						"Current Project:"
+					)),
+			)
+			.alignment(Alignment::Center)
+			.wrap(true)
+			.render(f, layout_chunk);
+        }    
+}
+
 pub fn draw_input_and_help_box<B>(
     f: &mut Frame<B>,
     app: &App,
@@ -86,12 +111,18 @@ pub fn draw_input_and_help_box<B>(
 
     let title = format!("{} Mode:", app.mode);
     Paragraph::new([Text::raw(&input_string)].iter())
-        .block(Block::default().borders(Borders::ALL).title(&title))
-        .render(f, chunks[0]);
+        .block(
+            TuiBlock::default()
+            .borders(Borders::ALL)
+            .title(&title)
+        )
+    .alignment(Alignment::Left)
+    .wrap(false)
+    .render(f, layout_chunk);
 
-    Paragraph::new([Text::raw(b.to_string())].iter())
-        .block(Block::default().borders(Borders::ALL).title("Help:"))
-        .render(f, chunks[1]);
+    // Paragraph::new([Text::raw(b.to_string())].iter())
+    //     .block(Block::default().borders(Borders::ALL).title("Help:"))
+    //     .render(f, chunks[1]);
 }
 
 pub fn draw_task_list<B>(f: &mut Frame<B>, app: &App, layout_chunk: Rect)
@@ -158,36 +189,36 @@ where
             ],
         })
         .collect::<Vec<TableItem>>();
-    draw_table(
-        f,
-        app,
-        chunks[0],
-        &header,
-        &messages,
-        app.selected_index,
-        (false, false),
-    );
+    // draw_table(
+    //     f,
+    //     app,
+    //     chunks[0],
+    //     &header,
+    //     &messages,
+    //     app.selected_index,
+    //     (false, false),
+    // );
 }
 
-pub fn draw_core_layout<B>(f: &mut Frame<B>, app: &App)
-where
-    B: Backend,
-{
-    let margin = if app.size.height > SMALL_TERMINAL_HEIGHT {
-        1
-    } else {
-        0
-    };
+// pub fn draw_core_layout<B>(f: &mut Frame<B>, app: &App)
+// where
+//     B: Backend,
+// {
+//     let margin = if app.size.height > SMALL_TERMINAL_HEIGHT {
+//         1
+//     } else {
+//         0
+//     };
 
-    let parent_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(20), Constraint::Length(3)].as_ref())
-        .margin(margin)
-        .split(f.size());
+//     let parent_layout = Layout::default()
+//         .direction(Direction::Vertical)
+//         .constraints([Constraint::Min(20), Constraint::Length(3)].as_ref())
+//         .margin(margin)
+//         .split(f.size());
 
-    draw_task_list(f, app, parent_layout[0]);
-    draw_input_and_help_box(f, app, parent_layout[1]);
-}
+//     draw_task_list(f, app, parent_layout[0]);
+//     draw_input_and_help_box(f, app, parent_layout[1]);
+// }
 
 fn draw_table<B>(
     f: &mut Frame<B>,
@@ -254,14 +285,14 @@ fn draw_table<B>(
         app.filter,
     );
 
-    Table::new(header.items.iter().map(|h| h.text), rows)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .style(Style::default())
-                .title(&title),
-        )
-        .style(Style::default())
-        .widths(&widths)
-        .render(f, layout_chunk);
+    // Table::new(header.items.iter().map(|h| h.text), rows)
+    //     .block(
+    //         Block::default()
+    //             .borders(Borders::ALL)
+    //             .style(Style::default())
+    //             .title(&title),
+    //     )
+    //     .style(Style::default())
+    //     .widths(&widths)
+    //     .render(f, layout_chunk);
 }

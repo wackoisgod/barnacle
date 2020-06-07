@@ -29,7 +29,7 @@ use std::{
 };
 use tui::{
     backend::{Backend, CrosstermBackend},
-    Terminal,
+    Terminal, layout::{Constraint, Direction, Layout},
 };
 extern crate serde_json;
 
@@ -151,7 +151,53 @@ async fn main() -> Result<(), Box<dyn Error>> {
         };
 
         terminal.draw(|mut f| {
-            ui::draw_core_layout(&mut f, &app);
+            //ui::draw_core_layout(&mut f, &app);
+            let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [Constraint::Percentage(75), Constraint::Percentage(25)]
+                    .as_ref(),
+            )
+            .split(f.size());
+        {
+            let chunks = Layout::default()
+					.direction(Direction::Horizontal)
+					.constraints(
+						[Constraint::Percentage(60), Constraint::Percentage(40)]
+							.as_ref(),
+					)
+					.split(chunks[0]);
+				{
+					let chunks = Layout::default()
+						.direction(Direction::Vertical)
+						.constraints(
+							[Constraint::Length(3), Constraint::Percentage(100)]
+								.as_ref(),
+						)
+						.split(chunks[0]);
+					{
+                        let chunks = Layout::default()
+                        .direction(Direction::Horizontal)
+                        .constraints(
+                            [
+                                Constraint::Percentage(60),
+                                Constraint::Percentage(40),
+                            ]
+                            .as_ref(),
+                        )
+                        .split(chunks[0]);
+                        ui::draw_input_and_help_box(&mut f, &app, chunks[0]);
+                        ui::draw_project_info(&mut f, &app, chunks[1]);
+                    // app.draw_user_input(&mut f, chunks[0], &events.tx);
+                    // app.draw_kernel_info(
+                    //     &mut f,
+                    //     chunks[1],
+                    //     &kernel.info.current_info,
+                    // );
+                    }
+                    ui::draw_task_list(&mut f, &app, chunks[1]);
+                }
+        }
         })?;
 
         match app.mode {
@@ -165,18 +211,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             },
         };
 
-        let cursor_offset = if app.size.height > ui::SMALL_TERMINAL_HEIGHT {
-            2
-        } else {
-            1
-        };
-
-        let hieght = terminal.get_frame().size().height;
-
         // Put the cursor back inside the input box
         terminal.set_cursor(
-            cursor_offset + app.get_cursor_position(),
-            hieght - 3,
+            1 + app.get_cursor_position(),
+            1,
         )?;
 
         io::stdout().flush().ok();
