@@ -309,25 +309,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                         }
                                     }
                                     VimCommand::ProjectNew(name) => {
-                                        app.new_project(&String::from(name))
+                                        app.new_project(&name)
                                             .await;
                                     }
                                     VimCommand::ProjectOpen(name) => {
-                                        app.select_project(&String::from(name))
+                                        app.select_project(&name)
                                             .await;
                                         app.sync().await;
                                     }
                                     VimCommand::ShowFinished(value) => {
                                         app.client_config.show_finished =
                                             Some(value);
-                                        app.client_config.save_config();
+                                        let _ = app.client_config.save_config();
                                     }
                                     VimCommand::ShowToday(value) => {
                                         app.client_config.show_today =
                                             Some(value);
-                                        app.client_config.save_config();
+                                        let _ = app.client_config.save_config();
                                     }
-                                    _ => {}
+                                    
+                                    VimCommand::TaskSetPriority(_, _) => {}
+                                    VimCommand::None => {}
                                 };
                                 app.mode = AppMode::Global
                             }

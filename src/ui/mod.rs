@@ -109,7 +109,6 @@ where
                 id: ColumnId::Id,
                 text: "Id",
                 width: get_percentage_width(layout_chunk.width, 0.2 / 9.0),
-                ..Default::default()
             },
             TableHeaderItem {
                 id: ColumnId::Content,

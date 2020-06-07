@@ -489,7 +489,7 @@ impl App {
             };
 
             if wait {
-                executor::block_on(thing);
+                let _ = executor::block_on::<_>(thing);
             } else {
                 task::spawn(thing);
             }
