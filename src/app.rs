@@ -65,7 +65,7 @@ impl VimCommand {
             "tmod" => {
                 let index = tokens.next().unwrap();
                 let content = parse_text_parts(&mut tokens)
-                    .unwrap_or(String::from("Invalid"));
+                    .unwrap_or_else(|| String::from("Invalid"));
                 VimCommand::TaskRename(index.parse::<usize>().unwrap(), content)
             }
             "tdel" => {
@@ -364,10 +364,10 @@ impl WorkItem {
         &self,
         a: AppFilterMode,
         sf: bool,
-        st: bool,
+        _st: bool,
     ) -> bool {
         // This is kind of gross but works for now
-        if self.status == ItemStatus::Finished && sf == false {
+        if self.status == ItemStatus::Finished && !sf {
             return false;
         }
 

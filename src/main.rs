@@ -10,9 +10,7 @@ use app::{App, AppMode, VimCommand, VimCommandBarResult, WorkItem};
 use backtrace::Backtrace;
 use clap::App as ClapApp;
 use config::ClientConfig;
-use std::error::Error;
-use std::str::SplitWhitespace;
-use uuid::Uuid;
+use std::{error::Error};
 
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
