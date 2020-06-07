@@ -44,6 +44,8 @@ pub enum VimCommand {
     ProjectOpen(String),
     ProjectSave,
     ProjectSaveAndQuit,
+    ShowToday(bool),
+    ShowFinished(bool),
     Quit,
     None,
 }
@@ -85,6 +87,14 @@ impl VimCommand {
             "n" => {
                 let name = tokens.next().unwrap();
                 VimCommand::ProjectNew(String::from(name))
+            }
+            "sf" => {
+                let name = tokens.next().unwrap();
+                VimCommand::ShowFinished(name.parse::<bool>().unwrap())
+            }
+            "st" => {
+                let name = tokens.next().unwrap();
+                VimCommand::ShowToday(name.parse::<bool>().unwrap())
             }
             _ => VimCommand::None,
         }
@@ -350,7 +360,17 @@ impl WorkItem {
         self.status = ItemStatus::WontFix;
     }
 
-    pub fn is_valid_for_mode(&self, a: AppFilterMode) -> bool {
+    pub fn is_valid_for_mode(
+        &self,
+        a: AppFilterMode,
+        sf: bool,
+        st: bool,
+    ) -> bool {
+        // This is kind of gross but works for now
+        if self.status == ItemStatus::Finished && sf == false {
+            return false;
+        }
+
         match a {
             AppFilterMode::All => true,
             AppFilterMode::Started => self.status == ItemStatus::Started,
@@ -415,13 +435,14 @@ impl App {
     }
 
     fn find_and_set_project(&mut self, project: &str) -> bool {
-        self.get_projects().iter().find(|v| v == &project)
-            .and_then(
-                |x| {
-                    self.current_project = Some(project.to_string());
-                    Some(x)
-                }
-            ).is_some()
+        self.get_projects()
+            .iter()
+            .find(|v| v == &project)
+            .and_then(|x| {
+                self.current_project = Some(project.to_string());
+                Some(x)
+            })
+            .is_some()
     }
 
     #[allow(unused_must_use)]
@@ -519,7 +540,13 @@ impl App {
     pub fn get_view(&self) -> Vec<WorkItem> {
         self.tasks
             .iter()
-            .filter(|l| l.is_valid_for_mode(self.filter))
+            .filter(|l| {
+                l.is_valid_for_mode(
+                    self.filter,
+                    self.client_config.show_finished.unwrap(),
+                    self.client_config.show_today.unwrap(),
+                )
+            })
             .map(|m| m)
             .cloned()
             .collect()
@@ -552,9 +579,8 @@ impl App {
     pub fn add_task(&mut self, mut item: WorkItem) {
         item.id = Some(Uuid::new_v4().to_string());
         self.tasks.push(item);
-        self.tasks.sort_by(|a, b| {
-            a.status.partial_cmp(&b.status).unwrap()
-        });
+        self.tasks
+            .sort_by(|a, b| a.status.partial_cmp(&b.status).unwrap());
         self.selected_index = self.tasks.len() - 1;
         self.mode = AppMode::Global;
         self.insert_bar.clear();

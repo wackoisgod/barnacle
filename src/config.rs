@@ -28,6 +28,8 @@ pub struct ClientConfig {
     pub client_id: String,
     pub client_secret: String,
     pub current_project: Option<String>,
+    pub show_finished: Option<bool>,
+    pub show_today: Option<bool>,
 }
 
 pub struct ConfigPaths {
@@ -40,6 +42,8 @@ impl ClientConfig {
             client_id: "".to_string(),
             client_secret: "".to_string(),
             current_project: Some("".to_string()),
+            show_finished: Some(false),
+            show_today: Some(false),
         }
     }
 
@@ -89,6 +93,8 @@ impl ClientConfig {
             self.client_id = config_yml.client_id;
             self.client_secret = config_yml.client_secret;
             self.current_project = config_yml.current_project;
+            self.show_finished = config_yml.show_finished;
+            self.show_today = config_yml.show_today;
 
             Ok(())
         } else {
@@ -126,6 +132,8 @@ impl ClientConfig {
                 client_id: client_id.trim().to_string(),
                 client_secret: client_secret.trim().to_string(),
                 current_project: Some("inbox".to_string()),
+                show_finished: Some(false),
+                show_today: Some(false),
             };
 
             let content_yml = serde_yaml::to_string(&config_yml)?;

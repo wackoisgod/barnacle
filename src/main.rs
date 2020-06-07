@@ -200,69 +200,69 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
 
                 match app.mode {
-                    AppMode::Global => {
-                        match key {
-                            Key::Char('s') => {
-                                if let Some(w) =
-                                    current_view.get_mut(app.selected_index)
-                                {
-                                    app.start_task(&w.id.as_ref().unwrap())
-                                }
+                    AppMode::Global => match key {
+                        Key::Char('s') => {
+                            if let Some(w) =
+                                current_view.get_mut(app.selected_index)
+                            {
+                                app.start_task(&w.id.as_ref().unwrap())
                             }
-                            Key::Char('x') => {
-                                app.fix_all_work_items();
-                            }
-                            Key::Char('f') => {
-                                if let Some(w) =
-                                    current_view.get_mut(app.selected_index)
-                                {
-                                    app.finish_task(&w.id.as_ref().unwrap())
-                                }
-                            }
-                            Key::Char('w') => {
-                                if let Some(w) =
-                                    current_view.get_mut(app.selected_index)
-                                {
-                                    app.wont_task(&w.id.as_ref().unwrap())
-                                }
-                            }
-                            Key::Char('d') => {
-                                if let Some(w) =
-                                    current_view.get_mut(app.selected_index)
-                                {
-                                    app.remove_task(&w.id.as_ref().unwrap())
-                                }
-                            }
-                            Key::Char('p') => {
-                                if app.register.is_some() {
-                                    app.add_task(app.register.as_ref().unwrap().clone());
-                                }
-                            }
-                            Key::Char('r') => {
-                                app.sync().await;
-                            }
-                            Key::Char('i') => app.mode = AppMode::Insert,
-                            Key::Char(':') => {
-                                app.mode = AppMode::Command;
-                                app.command_bar.handle_input(key);
-                            }
-                            Key::Up | Key::Char('k') => {
-                                let next_index = on_up_press_handler(
-                                    &app.tasks,
-                                    Some(app.selected_index),
-                                );
-                                app.selected_index = next_index;
-                            }
-                            Key::Down | Key::Char('j') => {
-                                let next_index = on_down_press_handler(
-                                    &app.tasks,
-                                    Some(app.selected_index),
-                                );
-                                app.selected_index = next_index;
-                            }
-                            _ => {}
                         }
-                    }
+                        Key::Char('x') => {
+                            app.fix_all_work_items();
+                        }
+                        Key::Char('f') => {
+                            if let Some(w) =
+                                current_view.get_mut(app.selected_index)
+                            {
+                                app.finish_task(&w.id.as_ref().unwrap())
+                            }
+                        }
+                        Key::Char('w') => {
+                            if let Some(w) =
+                                current_view.get_mut(app.selected_index)
+                            {
+                                app.wont_task(&w.id.as_ref().unwrap())
+                            }
+                        }
+                        Key::Char('d') => {
+                            if let Some(w) =
+                                current_view.get_mut(app.selected_index)
+                            {
+                                app.remove_task(&w.id.as_ref().unwrap())
+                            }
+                        }
+                        Key::Char('p') => {
+                            if app.register.is_some() {
+                                app.add_task(
+                                    app.register.as_ref().unwrap().clone(),
+                                );
+                            }
+                        }
+                        Key::Char('r') => {
+                            app.sync().await;
+                        }
+                        Key::Char('i') => app.mode = AppMode::Insert,
+                        Key::Char(':') => {
+                            app.mode = AppMode::Command;
+                            app.command_bar.handle_input(key);
+                        }
+                        Key::Up | Key::Char('k') => {
+                            let next_index = on_up_press_handler(
+                                &app.tasks,
+                                Some(app.selected_index),
+                            );
+                            app.selected_index = next_index;
+                        }
+                        Key::Down | Key::Char('j') => {
+                            let next_index = on_down_press_handler(
+                                &app.tasks,
+                                Some(app.selected_index),
+                            );
+                            app.selected_index = next_index;
+                        }
+                        _ => {}
+                    },
                     AppMode::Insert => match app.insert_bar.handle_input(key) {
                         VimCommandBarResult::Finished(task) => {
                             let mut work_item = WorkItem::new();
@@ -315,8 +315,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                             .await;
                                     }
                                     VimCommand::ProjectOpen(name) => {
-                                        app.select_project(&String::from(name)).await;
+                                        app.select_project(&String::from(name))
+                                            .await;
                                         app.sync().await;
+                                    }
+                                    VimCommand::ShowFinished(value) => {
+                                        app.client_config.show_finished =
+                                            Some(value);
+                                        app.client_config.save_config();
+                                    }
+                                    VimCommand::ShowToday(value) => {
+                                        app.client_config.show_today =
+                                            Some(value);
+                                        app.client_config.save_config();
                                     }
                                     _ => {}
                                 };
