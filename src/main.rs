@@ -10,7 +10,7 @@ use app::{App, AppMode, VimCommand, VimCommandBarResult, WorkItem};
 use backtrace::Backtrace;
 use clap::App as ClapApp;
 use config::ClientConfig;
-use std::{error::Error};
+use std::error::Error;
 
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
@@ -309,12 +309,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                         }
                                     }
                                     VimCommand::ProjectNew(name) => {
-                                        app.new_project(&name)
-                                            .await;
+                                        app.new_project(&name).await;
                                     }
                                     VimCommand::ProjectOpen(name) => {
-                                        app.select_project(&name)
-                                            .await;
+                                        app.select_project(&name).await;
                                         app.sync().await;
                                     }
                                     VimCommand::ShowFinished(value) => {
@@ -327,7 +325,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                             Some(value);
                                         let _ = app.client_config.save_config();
                                     }
-                                    
+
                                     VimCommand::TaskSetPriority(_, _) => {}
                                     VimCommand::None => {}
                                 };
