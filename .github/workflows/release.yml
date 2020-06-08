@@ -59,26 +59,13 @@ jobs:
           name=barnacle
           tag=$(git describe --tags --abbrev=0)
           release_name="$name-$tag-${{ matrix.target }}"
-          release_tar="${release_name}.tar.gz"
+          release_tar="${release_name}.tar"
           mkdir "$release_name"
           if [ "${{ matrix.target }}" != "x86_64-pc-windows-msvc" ]; then
               strip "target/${{ matrix.target }}/release/${{ matrix.bin }}"
           fi
           cp target/${{ matrix.target }}/release/${{ matrix.bin }} "$release_name"
-
-          echo "::set-output name=TAR::$release_name"
-
-      - name: Zip Package
-        uses: thedoctor0/zip-release@master
-        with:
-          filename: '${{ steps.package.outputs.TAR }}.zip'
-          directory: ${{ steps.package.outputs.TAR }}
-
-      - name: Hash
-        id: hash
-        shell: bash -e {0}
-        run: |
-          release_tar="${{ steps.package.outputs.TAR }}.zip"
+          tar cvf "$release_tar" "$release_name"
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
             echo "(Get-FileHash \"${release_tar}\" -Algorithm SHA256).Hash | Out-File -Encoding ASCII -NoNewline \"${release_tar}.sha256\"" | pwsh -c -
           else
