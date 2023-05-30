@@ -4,12 +4,13 @@ mod event;
 mod gist;
 mod ui;
 
-use crate::event::Key;
+use crate::event::KeyCode;
 use anyhow::Result;
 use app::{App, AppMode, VimCommand, VimCommandBarResult, WorkItem};
 use backtrace::Backtrace;
 use clap::App as ClapApp;
 use config::ClientConfig;
+use event::{EventIterator, KeyModifiers};
 use std::error::Error;
 
 use crossterm::{
@@ -18,16 +19,16 @@ use crossterm::{
     style::Print,
     terminal::{
         disable_raw_mode, enable_raw_mode, EnterAlternateScreen,
-        LeaveAlternateScreen,
+        LeaveAlternateScreen, is_raw_mode_enabled,
     },
 };
 use std::{
     io::{self, stdout, Write},
     panic::{self, PanicInfo},
 };
-use tui::{
+use ratatui::{
     backend::{Backend, CrosstermBackend},
-    Terminal,
+    Terminal, layout::{Direction, Layout, Constraint},
 };
 extern crate serde_json;
 
@@ -126,14 +127,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     client_config.load_config()?;
 
     let mut stdout = stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    enable_raw_mode()?;
+    if !is_raw_mode_enabled()? {
+        enable_raw_mode()?;
+        crossterm::execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    }
 
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-    terminal.hide_cursor()?;
+    terminal.show_cursor()?;
 
-    let events = event::Events::new();
+    let mut events = event::get_events();
 
     let mut app = App::new();
     app.client_config = client_config;
@@ -144,205 +147,196 @@ async fn main() -> Result<(), Box<dyn Error>> {
     terminal.clear()?;
 
     loop {
+        let parent_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Min(1), 
+                    Constraint::Length(3)
+                ].as_ref())
+            .margin(0);
+
         if let Ok(size) = terminal.backend().size() {
             app.size = size;
         };
 
         terminal.draw(|mut f| {
-            ui::draw_core_layout(&mut f, &app);
+            ui::draw_core_layout(&mut f, &app, &parent_layout);
         })?;
-
-        match app.mode {
-            AppMode::Global => match terminal.hide_cursor() {
-                Ok(_r) => {}
-                Err(_e) => {}
-            },
-            _ => match terminal.show_cursor() {
-                Ok(_r) => {}
-                Err(_e) => {}
-            },
-        };
-
-        let cursor_offset = if app.size.height > ui::SMALL_TERMINAL_HEIGHT {
-            2
-        } else {
-            1
-        };
-
-        let hieght = terminal.get_frame().size().height;
-
-        // Put the cursor back inside the input box
-        terminal.set_cursor(
-            cursor_offset + app.get_cursor_position(),
-            hieght - 3,
-        )?;
 
         io::stdout().flush().ok();
 
         let mut current_view = app.get_view();
         current_view.sort_by(|a, b| a.status.partial_cmp(&b.status).unwrap());
 
-        match events.next()? {
-            event::Event::Input(key) => {
-                if key == Key::Ctrl('d') {
+        let keyEvent = events.next_event()?;
+        let _keyHandles = match keyEvent.code {
+            KeyCode::Char('d') if keyEvent.modifiers.contains(KeyModifiers::CONTROL) => {
+                {
                     close_application()?;
                     break;
                 }
+            },
+            KeyCode::Char('c') => if let AppMode::Global = app.mode {
+                app.insert_bar.clear();
+                app.command_bar.clear();
+                app.mode = AppMode::Global;
+                terminal.hide_cursor()?;
+                app.selected_index = 0;
+                continue;
+            },
+            KeyCode::Esc => {
+                app.insert_bar.clear();
+                app.command_bar.clear();
+                app.mode = AppMode::Global;
+                terminal.hide_cursor()?;
+                app.selected_index = 0;
+                continue;
+            }
+            _=>{}
+        };
 
-                if key == Key::Ctrl('c') || key == Key::Esc {
-                    app.insert_bar.clear();
-                    app.command_bar.clear();
-                    app.mode = AppMode::Global;
-                    terminal.hide_cursor()?;
-                    app.selected_index = 0;
-                }
-
-                match app.mode {
-                    AppMode::Global => match key {
-                        Key::Char('s') => {
-                            if let Some(w) =
-                                current_view.get_mut(app.selected_index)
-                            {
-                                app.start_task(&w.id.as_ref().unwrap())
-                            }
-                        }
-                        Key::Char('x') => {
-                            app.fix_all_work_items();
-                        }
-                        Key::Char('f') => {
-                            if let Some(w) =
-                                current_view.get_mut(app.selected_index)
-                            {
-                                app.finish_task(&w.id.as_ref().unwrap())
-                            }
-                        }
-                        Key::Char('w') => {
-                            if let Some(w) =
-                                current_view.get_mut(app.selected_index)
-                            {
-                                app.wont_task(&w.id.as_ref().unwrap())
-                            }
-                        }
-                        Key::Char('d') => {
-                            if let Some(w) =
-                                current_view.get_mut(app.selected_index)
-                            {
-                                app.remove_task(&w.id.as_ref().unwrap())
-                            }
-                        }
-                        Key::Char('p') => {
-                            if app.register.is_some() {
-                                app.add_task(
-                                    app.register.as_ref().unwrap().clone(),
-                                );
-                            }
-                        }
-                        Key::Char('r') => {
-                            app.sync().await;
-                        }
-                        Key::Char('i') => app.mode = AppMode::Insert,
-                        Key::Char(':') => {
-                            app.mode = AppMode::Command;
-                            app.command_bar.handle_input(key);
-                        }
-                        Key::Up | Key::Char('k') => {
-                            let next_index = on_up_press_handler(
-                                &app.tasks,
-                                Some(app.selected_index),
-                            );
-                            app.selected_index = next_index;
-                        }
-                        Key::Down | Key::Char('j') => {
-                            let next_index = on_down_press_handler(
-                                &app.tasks,
-                                Some(app.selected_index),
-                            );
-                            app.selected_index = next_index;
-                        }
-                        _ => {}
-                    },
-                    AppMode::Insert => match app.insert_bar.handle_input(key) {
-                        VimCommandBarResult::Finished(task) => {
-                            let mut work_item = WorkItem::new();
-                            work_item.content = Some(task);
-                            app.add_task(work_item);
-                        }
-                        VimCommandBarResult::Aborted => {
-                            app.mode = AppMode::Global
-                        }
-                        _ => {}
-                    },
-                    AppMode::Command => {
-                        match app.command_bar.handle_input(key) {
-                            VimCommandBarResult::Finished(cmd) => {
-                                let c = VimCommand::from(cmd);
-                                match c {
-                                    VimCommand::Quit => {
-                                        close_application()?;
-                                        break;
-                                    }
-                                    VimCommand::ProjectSaveAndQuit => {
-                                        app.save_project(true, false);
-                                        close_application()?;
-                                        break;
-                                    }
-                                    VimCommand::ProjectSave => {
-                                        app.save_project(false, false);
-                                    }
-                                    VimCommand::TaskRename(index, content) => {
-                                        if let Some(w) =
-                                            current_view.get_mut(index)
-                                        {
-                                            app.update_work_item_text(
-                                                &w.id.as_ref().unwrap(),
-                                                &content,
-                                            );
-                                        }
-                                    }
-                                    VimCommand::TaskDelete(index) => {
-                                        if let Some(w) =
-                                            current_view.get_mut(index)
-                                        {
-                                            app.remove_task(
-                                                &w.id.as_ref().unwrap(),
-                                            )
-                                        }
-                                    }
-                                    VimCommand::ProjectNew(name) => {
-                                        app.new_project(&name).await;
-                                    }
-                                    VimCommand::ProjectOpen(name) => {
-                                        app.select_project(&name).await;
-                                        app.sync().await;
-                                    }
-                                    VimCommand::ShowFinished(value) => {
-                                        app.client_config.show_finished =
-                                            Some(value);
-                                        let _ = app.client_config.save_config();
-                                    }
-                                    VimCommand::ShowToday(value) => {
-                                        app.client_config.show_today =
-                                            Some(value);
-                                        let _ = app.client_config.save_config();
-                                    }
-
-                                    VimCommand::TaskSetPriority(_, _) => {}
-                                    VimCommand::None => {}
-                                };
-                                app.mode = AppMode::Global
-                            }
-                            VimCommandBarResult::Aborted => {
-                                app.mode = AppMode::Global
-                            }
-                            _ => {}
-                        }
+        match app.mode {
+            AppMode::Global => match keyEvent.code {
+                KeyCode::Char('s') => {
+                    if let Some(w) =
+                        current_view.get_mut(app.selected_index)
+                    {
+                        app.start_task(&w.id.as_ref().unwrap())
                     }
-                };
+                },
+                KeyCode::Char('x') => {
+                    app.fix_all_work_items();
+                }
+                KeyCode::Char('f') => {
+                    if let Some(w) =
+                        current_view.get_mut(app.selected_index)
+                    {
+                        app.finish_task(&w.id.as_ref().unwrap())
+                    }
+                }
+                KeyCode::Char('w') => {
+                    if let Some(w) =
+                        current_view.get_mut(app.selected_index)
+                    {
+                        app.wont_task(&w.id.as_ref().unwrap())
+                    }
+                }
+                KeyCode::Char('d') => {
+                    if let Some(w) =
+                        current_view.get_mut(app.selected_index)
+                    {
+                        app.remove_task(&w.id.as_ref().unwrap())
+                    }
+                }
+                KeyCode::Char('p') => {
+                    if app.register.is_some() {
+                        app.add_task(
+                            app.register.as_ref().unwrap().clone(),
+                        );
+                    }
+                }
+                KeyCode::Char('r') => {
+                    app.sync().await;
+                }
+                KeyCode::Char('i') => app.mode = AppMode::Insert,
+                KeyCode::Char(':') => {
+                    app.mode = AppMode::Command;
+                    app.command_bar.handle_input(keyEvent);
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    let next_index = on_up_press_handler(
+                        &app.tasks,
+                        Some(app.selected_index),
+                    );
+                    app.selected_index = next_index;
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    let next_index = on_down_press_handler(
+                        &app.tasks,
+                        Some(app.selected_index),
+                    );
+                    app.selected_index = next_index;
+                }
+                _=>{}
             }
-            event::Event::Tick => {
-                // we need to do somet stuff herer ?
+            AppMode::Insert => match app.insert_bar.handle_input(keyEvent) {
+                VimCommandBarResult::Finished(task) => {
+                    let mut work_item = WorkItem::new();
+                    work_item.content = Some(task);
+                    app.add_task(work_item);
+                }
+                VimCommandBarResult::Aborted => {
+                    app.mode = AppMode::Global
+                }
+                _ => {}
+            },
+            AppMode::Command => {
+                match app.command_bar.handle_input(keyEvent) {
+                    VimCommandBarResult::Finished(cmd) => {
+                        let c = VimCommand::from(cmd);
+                        match c {
+                            VimCommand::Quit => {
+                                close_application()?;
+                                break;
+                            }
+                            VimCommand::ProjectSaveAndQuit => {
+                                app.save_project(true, false);
+                                close_application()?;
+                                break;
+                            }
+                            VimCommand::ProjectSave => {
+                                app.save_project(false, false);
+                            }
+                            VimCommand::TaskRename(index, content) => {
+                                if let Some(w) =
+                                    current_view.get_mut(index)
+                                {
+                                    app.update_work_item_text(
+                                        &w.id.as_ref().unwrap(),
+                                        &content,
+                                    );
+                                }
+                            }
+                            VimCommand::TaskDelete(index) => {
+                                if let Some(w) =
+                                    current_view.get_mut(index)
+                                {
+                                    app.remove_task(
+                                        &w.id.as_ref().unwrap(),
+                                    )
+                                }
+                            }
+                            VimCommand::ProjectNew(name) => {
+                                app.new_project(&name).await;
+                            }
+                            VimCommand::ProjectOpen(name) => {
+                                app.select_project(&name).await;
+                                app.sync().await;
+                            }
+                            VimCommand::ShowFinished(value) => {
+                                app.client_config.show_finished =
+                                    Some(value);
+                                let _ = app.client_config.save_config();
+                            }
+                            VimCommand::ShowToday(value) => {
+                                app.client_config.show_today =
+                                    Some(value);
+                                let _ = app.client_config.save_config();
+                            }
+
+                            VimCommand::TaskSetPriority(_, _) => {}
+                            VimCommand::None => {}
+                        };
+                        app.mode = AppMode::Global
+                    }
+                    VimCommandBarResult::Aborted => {
+                        app.mode = AppMode::Global
+                    }
+                _ => {}
+                }
             }
-        }
+        };
     }
 
     Ok(())

@@ -2,18 +2,18 @@
 name = "bc"
 version = "0.1.0"
 authors = ["Andrew Spiering <aspiering@gmail.com>"]
-edition = "2018"
+edition = "2021"
 default-run = "bc"
 
 [dependencies]
 yukikaze = "1.0.3"
 serde_json = "1.0.48"
 serde_yaml = "0.8.11"
-serde = { version = "1.0.104", features = ["derive"] }
+serde = { version = "1", features = ["derive"]}
+crossterm = { version = "0.26"}
 clap = "2.33.0"
-tui = { version = "0.8.0", features = ["crossterm"], default-features = false }
-crossterm =  "0.15"
-unicode-width = "0.1.7"
+ratatui = "0.20"
+unicode-width = "0.1"
 chrono = "0.4"
 num_enum = "0.4.2"
 backtrace = "0.3.43"
@@ -24,6 +24,7 @@ tokio = { version = "0.2.11", features = ["full"] }
 http = "0.2"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 futures = "0.3.4"
+bitflags = "1.2.1"
 
 [[bin]]
 name = "bc"

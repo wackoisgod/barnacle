@@ -1,12 +1,14 @@
 use super::app::{App, AppMode, ItemStatus, WorkItem};
 
-use tui::{
-    backend::Backend,
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Paragraph, Row, Table, Text, Widget},
-    Frame,
-};
+
+
+use ratatui::backend::{Backend};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Span};
+use ratatui::widgets::{Block, Borders, Paragraph, Row, Table};
+
+use ratatui::Frame;
 
 use chrono::offset::Local;
 use std::fmt::Write;
@@ -85,13 +87,22 @@ pub fn draw_input_and_help_box<B>(
     };
 
     let title = format!("{} Mode:", app.mode);
-    Paragraph::new([Text::raw(&input_string)].iter())
-        .block(Block::default().borders(Borders::ALL).title(&title))
-        .render(f, chunks[0]);
 
-    Paragraph::new([Text::raw(b.to_string())].iter())
-        .block(Block::default().borders(Borders::ALL).title("Help:"))
-        .render(f, chunks[1]);
+    
+    let p1 = Paragraph::new(Span::raw(input_string))
+        .block(Block::default().borders(Borders::ALL).title(Span::raw(title)))
+        .style(match app.mode {
+            AppMode::Global => Style::default(),
+            AppMode::Command => Style::default().fg(Color::Yellow),
+            AppMode::Insert => Style::default().fg(Color::Green),
+        });
+
+    f.render_widget(p1, chunks[0]);
+
+    let p2 = Paragraph::new(Span::raw(b.to_string()))
+        .block(Block::default().borders(Borders::ALL).title("Help:"));
+
+    f.render_widget(p2, chunks[1]);
 }
 
 pub fn draw_task_list<B>(f: &mut Frame<B>, app: &App, layout_chunk: Rect)
@@ -168,24 +179,28 @@ where
     );
 }
 
-pub fn draw_core_layout<B>(f: &mut Frame<B>, app: &App)
+pub fn draw_core_layout<B>(f: &mut Frame<B>, app: &App, layout: &Layout)
 where
     B: Backend,
 {
-    let margin = if app.size.height > SMALL_TERMINAL_HEIGHT {
-        1
-    } else {
-        0
-    };
-
-    let parent_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(20), Constraint::Length(3)].as_ref())
-        .margin(margin)
-        .split(f.size());
+    let parent_layout: std::rc::Rc<[Rect]> = layout.split(f.size());
 
     draw_task_list(f, app, parent_layout[0]);
     draw_input_and_help_box(f, app, parent_layout[1]);
+
+    match app.mode {
+        AppMode::Global => {
+            {}
+        },
+        _ => {
+            // Put the cursor back inside the input box
+            f.set_cursor(
+                1 + app.get_cursor_position(),
+                parent_layout[1].y + 1,
+            );
+        },
+    };
+
 }
 
 fn draw_table<B>(
@@ -203,7 +218,7 @@ fn draw_table<B>(
 
     let selected_style = Style::default()
         .fg(Color::LightBlue)
-        .modifier(Modifier::BOLD);
+        .add_modifier(Modifier::BOLD);
 
     let padding = 5;
     let offset = layout_chunk
@@ -220,7 +235,7 @@ fn draw_table<B>(
         if let Some(_title_idx) = header.get_index(ColumnId::Content) {
             match item.org_item.status {
                 ItemStatus::WontFix => {
-                    style = style.fg(Color::Red).modifier(Modifier::CROSSED_OUT)
+                    style = style.fg(Color::Red).add_modifier(Modifier::CROSSED_OUT)
                 }
                 ItemStatus::Started => style = style.fg(Color::LightGreen),
                 ItemStatus::Finished => {
@@ -238,14 +253,14 @@ fn draw_table<B>(
             style = selected_style;
         }
 
-        Row::StyledData(formatted_row.into_iter(), style)
+        Row::new(formatted_row.into_iter()).style(style)
     });
 
     let widths = header
         .items
         .iter()
         .map(|h| Constraint::Length(h.width))
-        .collect::<Vec<tui::layout::Constraint>>();
+        .collect::<Vec<ratatui::layout::Constraint>>();
 
     let title = format!(
         "{}({}):",
@@ -253,14 +268,18 @@ fn draw_table<B>(
         app.filter,
     );
 
-    Table::new(header.items.iter().map(|h| h.text), rows)
+    let h = Row::new(header.items.iter().map(|h| h.text.clone()));
+
+    let t1 = Table::new(rows)
+        .header(h)
         .block(
             Block::default()
                 .borders(Borders::ALL)
                 .style(Style::default())
-                .title(&title),
+                .title(Span::raw(title)),
         )
         .style(Style::default())
-        .widths(&widths)
-        .render(f, layout_chunk);
+        .widths(&widths);
+
+    f.render_widget(t1, layout_chunk);
 }

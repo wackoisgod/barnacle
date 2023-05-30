@@ -1,73 +1,72 @@
-use crate::event::Key;
-use crossterm::event;
-use std::{sync::mpsc, thread, time::Duration};
+use std::convert::{TryFrom, TryInto};
 
-#[derive(Debug, Clone, Copy)]
-/// Configuration for event handling.
-pub struct EventConfig {
-    /// The key that is used to exit the application.
-    pub exit_key: Key,
-    /// The tick rate at which the application will sent an tick event.
-    pub tick_rate: Duration,
+use crossterm::event;
+
+use super::EventIterator;
+
+pub struct CrosstermEvents {}
+
+impl CrosstermEvents {
+    /// Creates a new `CrosstermEvents`
+    pub fn new() -> Self {
+        Self {}
+    }
 }
 
-impl Default for EventConfig {
-    fn default() -> EventConfig {
-        EventConfig {
-            exit_key: Key::Ctrl('c'),
-            tick_rate: Duration::from_millis(150),
+impl EventIterator for CrosstermEvents {
+    fn next_event(&mut self) -> std::io::Result<super::KeyEvent> {
+        loop {
+            if let event::Event::Key(k) = event::read()? {
+                if let Ok(k) = k.try_into() {
+                    return Ok(k);
+                }
+            }
         }
     }
 }
 
-/// An occurred event.
-pub enum Event<I> {
-    /// An input event occurred.
-    Input(I),
-    /// An tick event occurred.
-    Tick,
-}
+impl TryFrom<event::KeyEvent> for super::KeyEvent {
+    type Error = ();
 
-/// A small event handler that wrap crossterm input and tick event. Each event
-/// type is handled in its own thread and returned to a common `Receiver`
-pub struct Events {
-    rx: mpsc::Receiver<Event<Key>>,
-    // Need to be kept around to prevent disposing the sender side.
-    _tx: mpsc::Sender<Event<Key>>,
-}
+    fn try_from(event: event::KeyEvent) -> Result<Self, ()> {
+        match event.kind == event::KeyEventKind::Release {
+            true => return Err(()),
+            false => (),
+        }
 
-impl Events {
-    /// Constructs an new instance of `Events` with the default config.
-    pub fn new() -> Events {
-        Events::with_config(EventConfig::default())
-    }
+        let code = match event.code {
+            event::KeyCode::Backspace => super::KeyCode::Backspace,
+            event::KeyCode::Enter => super::KeyCode::Enter,
+            event::KeyCode::Left => super::KeyCode::Left,
+            event::KeyCode::Right => super::KeyCode::Right,
+            event::KeyCode::Up => super::KeyCode::Up,
+            event::KeyCode::Down => super::KeyCode::Down,
+            event::KeyCode::Home => super::KeyCode::Home,
+            event::KeyCode::End => super::KeyCode::End,
+            event::KeyCode::PageUp => super::KeyCode::PageUp,
+            event::KeyCode::PageDown => super::KeyCode::PageDown,
+            event::KeyCode::Tab => super::KeyCode::Tab,
+            event::KeyCode::Delete => super::KeyCode::Delete,
+            event::KeyCode::Insert => super::KeyCode::Ins,
+            event::KeyCode::F(f) => super::KeyCode::F(f),
+            event::KeyCode::Char(c) => super::KeyCode::Char(c),
+            event::KeyCode::Null => super::KeyCode::Null,
+            event::KeyCode::Esc => super::KeyCode::Esc,
+            _ => return Err(()),
+        };
 
-    /// Constructs an new instance of `Events` from given config.
-    pub fn with_config(config: EventConfig) -> Events {
-        let (tx, rx) = mpsc::channel();
+        let mut modifiers = super::KeyModifiers::empty();
 
-        let event_tx = tx.clone();
-        thread::spawn(move || {
-            loop {
-                // poll for tick rate duration, if no event, sent tick event.
-                if event::poll(config.tick_rate).unwrap() {
-                    if let event::Event::Key(key) = event::read().unwrap() {
-                        let key = Key::from(key);
+        if event.modifiers.contains(event::KeyModifiers::SHIFT) {
+            modifiers |= super::KeyModifiers::SHIFT;
+        }
+        if event.modifiers.contains(event::KeyModifiers::CONTROL) {
+            modifiers |= super::KeyModifiers::CONTROL;
+        }
+        if event.modifiers.contains(event::KeyModifiers::ALT) {
+            modifiers |= super::KeyModifiers::ALT;
+        }
 
-                        event_tx.send(Event::Input(key)).unwrap();
-                    }
-                }
-
-                event_tx.send(Event::Tick).unwrap();
-            }
-        });
-
-        Events { rx, _tx: tx }
-    }
-
-    /// Attempts to read an event.
-    /// This function will block the current thread.
-    pub fn next(&self) -> Result<Event<Key>, mpsc::RecvError> {
-        self.rx.recv()
+        Ok(super::KeyEvent { code, modifiers })
     }
 }

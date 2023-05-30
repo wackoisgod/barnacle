@@ -1,7 +1,7 @@
 extern crate chrono;
 use super::config::ClientConfig;
 use super::{gist::get_gist_file, gist::GistUpdate, gist::ListGist};
-use crate::event::Key;
+use crate::event::{KeyEvent, KeyCode, KeyModifiers};
 use chrono::prelude::*;
 use core::str::SplitWhitespace;
 use futures::executor;
@@ -12,7 +12,7 @@ use std::convert::TryInto;
 use std::fmt;
 use std::fmt::Write;
 use tokio::task;
-use tui::layout::Rect;
+use ratatui::layout::Rect;
 use unicode_width::UnicodeWidthChar;
 use uuid::Uuid;
 
@@ -143,9 +143,9 @@ impl VimBar {
         self.input_cursor_position
     }
 
-    pub fn handle_input(&mut self, key: Key) -> VimCommandBarResult {
-        match key {
-            Key::Left => {
+    pub fn handle_input(&mut self, key: KeyEvent) -> VimCommandBarResult {
+        match key.code {
+            KeyCode::Left => {
                 if self.buffer.len_chars() > 0 && self.input_idx > 0 {
                     let last_c = self.buffer.char(self.input_idx - 1);
                     self.input_idx -= 1;
@@ -154,19 +154,19 @@ impl VimBar {
                 }
                 VimCommandBarResult::StillEditing
             }
-            Key::Char(c) => {
+            KeyCode::Char(c) => {
                 self.buffer.insert_char(self.input_idx, c);
                 self.input_idx += 1;
                 self.input_cursor_position += compute_character_width(c);
                 VimCommandBarResult::StillEditing
             }
-            Key::Enter => {
+            KeyCode::Enter => {
                 let mut result = String::new();
                 write!(result, "{}", self.buffer).unwrap();
                 self.clear();
                 VimCommandBarResult::Finished(result)
             }
-            Key::Backspace => {
+            KeyCode::Backspace => {
                 match (self.buffer.len_chars() == 0, self.input_idx == 0) {
                     (true, _) => return VimCommandBarResult::Aborted,
                     (false, true) => {}
@@ -180,18 +180,18 @@ impl VimBar {
                 }
                 VimCommandBarResult::StillEditing
             }
-            Key::Delete => {
+            KeyCode::Delete => {
                 let len = self.buffer.len_chars();
                 if self.input_idx < len {
                     self.buffer.remove(self.input_idx..=self.input_idx);
                 }
                 VimCommandBarResult::StillEditing
             }
-            Key::Ctrl('u') => {
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.clear();
                 VimCommandBarResult::StillEditing
             }
-            Key::Ctrl('a') => {
+            KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.goto_being();
                 VimCommandBarResult::StillEditing
             }
